@@ -23,7 +23,7 @@ const io = new Server({});
 io.on("connection", (socket: Socket) => {
 	console.log("con", socket.id);
 	socket.conn.on("packet", ({ type, data }) => {
-        if (data.includes("ping1") || data.includes("hdt")) return;
+        if (data?.includes("ping1") || data?.includes("hdt")) return;
         console.log("packet");
         console.log(type);
         console.log(data);

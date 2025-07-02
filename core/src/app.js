@@ -1,5 +1,5 @@
-import { io } from "socket.io-client";
 import * as zip from "@zip.js/zip.js";
+import { io } from "socket.io-client";
 
 var playerName;
 var playerClassIndex;
@@ -244,7 +244,7 @@ window.onload = function () {
           "http://" + (devTest ? "localhost" : a.ip) + ":" + a.port,
           {
             reconnection: true,
-            transport: "websocket",
+            transports: ["websocket"],
             forceNew: false,
           }
         );
@@ -561,8 +561,10 @@ var target = {
   dOffset: 0,
 };
 var gameObjects = [];
+window.gameObjects = gameObjects;
 var bullets = [];
 var gameMap = null;
+window.getGameMap = () => gameMap;
 var mapTileScale = 0;
 var leaderboard = [];
 var keys = {
@@ -3265,7 +3267,8 @@ function doGame(a) {
   updateParticles(a, 1);
   drawMap(2);
   // drawPlayerNames();
-  drawEdgeShader();
+  // :(
+  // drawEdgeShader();
   drawGameLights(a);
   // updateAnimTexts(a);
   updateNotifications(a);
@@ -5013,9 +5016,10 @@ function loadModPack(a, b) {
       zipFileCloser ||= new d();
       var l = "";
       const reader = new zip.ZipReader(
-        new zip.HttpReader(g),
-        function (reader) {
-          reader.getEntries(function (b) {
+        new zip.HttpReader(g)
+      );
+      reader.
+      reader.getEntries(function (b) {
             if (b.length) {
               zipFileCloser.init(reader, b.length);
               for (var d = 0; d < b.length; d++) {
@@ -5056,13 +5060,6 @@ function loadModPack(a, b) {
               }
             }
           });
-        },
-        function (a) {
-          loadingTexturePack = false;
-          console.log(a);
-          setModInfoText("Mod could not be loaded");
-        }
-      );
     }
   } catch (m) {
     console.log(m);

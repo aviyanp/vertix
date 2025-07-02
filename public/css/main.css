@@ -69,7 +69,7 @@ select {
 }
 
 canvas {
-	cursor: url("/web/20211107033150im_/http://vertix.io/images/cursor_aim.png") 17 17, default;
+	cursor: url("/images/cursor_aim.png") 17 17, default;
 	width: 100% !important;
 	height: 100% !important;
 	margin: 0;
@@ -211,7 +211,7 @@ div {
 }
 
 .rewardText {
-	cursor: url("/web/20211107033150im_/http://vertix.io/images/cursor_aim.png") 17 17, default;
+	cursor: url("/images/cursor_aim.png") 17 17, default;
 	pointer-events: all;
 	position: relative;
 	font-size: 15px;

@@ -9,6 +9,6 @@
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "types": ["@rspack/core/module"]
+    // "types": ["@rspack/core/module"]
   }
 }

@@ -4,19 +4,16 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"build": "rspack --node-env production # no easy way to use ../.env without breaking things",
-		"dev": "rspack --watch --node-env development # :pensive:"
+		"dev": "rolldown -c rolldown.config.js --watch"
 	},
 	"keywords": [],
 	"author": "",
 	"license": "ISC",
 	"devDependencies": {
-		"@rspack/cli": "^1.3.13",
-		"@rspack/core": "^1.3.13"
-	},
-	"dependencies": {
+		"rolldown": "1.0.0-beta.23",
 		"@zip.js/zip.js": "^2.7.62",
 		"socket.io-client": "^4.8.1"
 	},
-  "type": "module"
+	"dependencies": {},
+	"type": "module"
 }

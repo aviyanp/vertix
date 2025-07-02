@@ -4887,6 +4887,7 @@ function setModInfoText(a) {
   }
 }
 var fileFormat = "";
+window.loadModPack = loadModPack;
 function loadModPack(a, b) {
   try {
     if (!loadingTexturePack) {
@@ -4991,7 +4992,7 @@ function loadModPack(a, b) {
       var g = "";
       if (b) {
         doSounds = false;
-        g = ".././res.zip";
+        g = "/res.zip";
       } else {
         if (a == "") {
           setModInfoText("Please enter a mod Key/URL");
@@ -5018,7 +5019,6 @@ function loadModPack(a, b) {
       const reader = new zip.ZipReader(
         new zip.HttpReader(g)
       );
-      reader.
       reader.getEntries(function (b) {
             if (b.length) {
               zipFileCloser.init(reader, b.length);

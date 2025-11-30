@@ -74,7 +74,7 @@ server/
 
 ### Prerequisites
 
-- Node.js 18 or higher
+- Node.js 22 or higher (for native TypeScript support)
 - npm or pnpm
 
 ### Installation
@@ -100,14 +100,8 @@ npm run dev:legacy
 ### Production
 
 ```bash
-# Build TypeScript
-npm run build
-
 # Start production server
 npm start
-
-# Or run TypeScript directly
-npm run start:ts
 ```
 
 ### Type Checking
@@ -115,6 +109,8 @@ npm run start:ts
 ```bash
 # Run TypeScript type checking
 npm run lint
+# or
+npm run typecheck
 ```
 
 ## Environment Variables

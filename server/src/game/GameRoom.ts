@@ -10,6 +10,7 @@ import { GameMap } from "../map/GameMap.ts";
 import { PhysicsEngine } from "../physics/PhysicsEngine.ts";
 import { CollisionDetection } from "../physics/CollisionDetection.ts";
 import { Projectile } from "../weapons/Projectile.ts";
+import { isValidClassIndex } from "../classes/CharacterClasses.ts";
 import {
 	SERVER_CONFIG,
 	MAP_CONFIG,
@@ -422,6 +423,11 @@ export class GameRoom {
 	public addPlayer(socketId: string, name: string, classIndex: number): Player | null {
 		if (this.entityManager.getPlayerCount() >= this.maxPlayers) {
 			return null;
+		}
+
+		// Validate classIndex
+		if (!isValidClassIndex(classIndex)) {
+			classIndex = 0; // Default to Triggerman
 		}
 
 		const player = new Player(socketId, name, classIndex);

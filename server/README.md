@@ -74,7 +74,7 @@ server/
 
 ### Prerequisites
 
-- Node.js 22 or higher (for native TypeScript support)
+- Node.js 18 or higher
 - npm or pnpm
 
 ### Installation

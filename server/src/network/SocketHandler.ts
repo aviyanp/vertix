@@ -147,14 +147,32 @@ export class SocketHandler {
 			);
 		}
 
+		// Spawn the player
+		room.spawnPlayer(player);
+
 		// Track player room
 		this.playerRooms.set(socket.id, room.id);
 
 		// Join socket room
 		socket.join(room.id);
 
-		// Notify other players
-		this.io.to(room.id).emit("add", player.toJSON());
+		// Get game setup data
+		const gameSetupData = room.getGameSetupData(player);
+
+		// Send gameSetup event to the joining player
+		// Format: gameSetup(JSON string, isInitialSetup, gameStart)
+		socket.emit("gameSetup", JSON.stringify(gameSetupData), true, true);
+
+		// Notify other players about the new player
+		socket.to(room.id).emit("add", player.toJSON());
+
+		// Send leaderboard update
+		const leaderboard = room.getLeaderboard().getAllEntries();
+		socket.emit("lb", leaderboard);
+
+		// Send team scores if team mode
+		const teamScores = room.getTeamScores();
+		socket.emit("ts", teamScores.red, teamScores.blue);
 	}
 
 	/**

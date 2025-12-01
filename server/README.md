@@ -77,7 +77,25 @@ server/
 - Node.js 18 or higher
 - npm or pnpm
 
-### Installation
+### Quick Start (Recommended)
+
+The easiest way to run both the client and server together is from the **project root**:
+
+```bash
+# From the root directory (vertix/)
+pnpm install     # Install all dependencies
+pnpm run dev     # Builds client and starts server with hot reload
+```
+
+This will:
+1. Build the client code (`core/`) which outputs to `public/js/app.js`
+2. Start the server with hot reload
+
+Then open `http://localhost:1118` in your browser.
+
+### Server-Only Installation
+
+If you only want to run the server (assuming the client is already built):
 
 ```bash
 # Navigate to server directory
@@ -86,6 +104,8 @@ cd server
 # Install dependencies
 npm install
 ```
+
+> **Note**: The client code must be built first. Run `pnpm run dev` from the `core/` directory, or use the root `pnpm run dev` command to build everything together.
 
 ### Development
 

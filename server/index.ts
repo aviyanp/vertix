@@ -55,6 +55,7 @@ io.on("connection", (socket: Socket) => {
 		index: players.length,
 		name: "Guest_" + JSON.stringify(players.length),
 		team: "blue",
+		type: "player",
 		weapons: [ testWep ],
 		dead: true,
 		speed: 0.5,

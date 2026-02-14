@@ -3878,7 +3878,6 @@ function getSprite(a) {
     tmpPicture = localStorage.getItem(a + ".png");
     b.src = tmpPicture;
     b.crossOrigin = 'anonymous';
-    b.src = a + ".png";
   } catch (d) {
     console.log(d);
   }

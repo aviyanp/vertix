@@ -1,8 +1,8 @@
 import { defineConfig } from "rolldown";
 
 export default defineConfig({
-	input: "src/app.js",
+	input: "./core/src/app.js",
 	output: {
-		dir: "../public/js",
+		dir: "./public/js",
 	},
 });

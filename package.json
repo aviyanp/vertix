@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "pnpm rolldown -c ./core/rolldown.config.js",
     "dev": "pnpm run --parallel --reporter-hide-prefix --color --recursive dev"
   },
   "keywords": [],
@@ -11,5 +12,9 @@
   "license": "ISC",
   "devDependencies": {
     "@biomejs/biome": "1.9.4"
+  },
+  "dependencies": {
+    "@zip.js/zip.js": "^2.8.20",
+    "rolldown": "1.0.0-rc.4"
   }
 }

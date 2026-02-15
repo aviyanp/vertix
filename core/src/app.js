@@ -4284,7 +4284,6 @@ function setCooldownAnimation(a, b, d) {
   }
 }
 function shootNextBullet(a, b) {
-  console.log(a)
   var d = getNextBullet();
   if (d != undefined) {
     d.serverIndex = a.si;

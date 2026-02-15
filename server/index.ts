@@ -132,7 +132,7 @@ io.on("connection", (socket: Socket) => {
 		nameYOffset: 0,
 		dead: true,
 		type: "player",
-		team: "blue",
+		//team: "blue/red",
 	};
 	players.push(player)
 
@@ -174,10 +174,12 @@ io.on("connection", (socket: Socket) => {
 		const gameSetup = {
 			mapData: {
 				gameMode: {
-					name: "Team Deathmatch",
-					score: 50,
-					desc1: "you are team RED",
-					desc2: "you are team BLUE"
+					code: "ffa",
+					name: "Free For All",
+					score: 1500,
+					desc1: "Free For All",
+					desc2: "",
+					teams: false,
 				},
 				clutter: [],
 				genData: gameMap,

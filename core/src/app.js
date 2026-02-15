@@ -1643,9 +1643,11 @@ function setupSocket(a) {
   a.on("r", function(a) {
     var b = findUserByIndex(player.index);
     if (b != null) {
-      if (a == 0 && b.weapons[a].maxAmmo > 1) {
+      /*
+      if (b.weapons[a].ammo == b.weapons[a].maxAmmo) {
         showNotification("Ammo Full");
       }
+      */
       b.weapons[a].reloadTime = 0;
       b.weapons[a].ammo = b.weapons[a].maxAmmo;
       setCooldownAnimation(a, b.weapons[a].reloadTime, false);
@@ -4282,6 +4284,7 @@ function setCooldownAnimation(a, b, d) {
   }
 }
 function shootNextBullet(a, b) {
+  console.log(a)
   var d = getNextBullet();
   if (d != undefined) {
     d.serverIndex = a.si;

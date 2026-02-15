@@ -39,27 +39,71 @@ io.on("connection", (socket: Socket) => {
 
 	let smg = {
 		weaponIndex: 0,
-		ammo: 30,
-		maxAmmo: 30,
-		fireRate: 20,
-		reloadTime: 10,
+		dmg: 20,
+		ammo: 24,
+		maxAmmo: 24,
+		reloadTime: 0,
+		reloadSpeed: 800,
+		fireRate: 143,
+		spread: [ 0, 0, 0 ],
+		spreadIndex: 0,
 		width: 30,
 		length: 90,
 		yOffset: 55,
 		holdDist: 5,
+	
+		bSpeed: 6,
+		bWidth: 8,
+		bHeight: 18,
+		bRandScale: [0, 0],
+		cAcc: 12,
+		maxLife: 500,
+		bulletsPerShot: 1,
+		pierceCount: 1,
+		bounce: false,
+		distBased: false,
+		explodeOnDeath: false,
+		bDist: 48,
+		bTrail: 2,
+		bSprite: 0,
+		glowWidth: 50,
+		glowHeight: 100,
+		shake: 0.4,
 		lastShot: 0,
 	}
 
 	let grenades = {
 		weaponIndex: 5,
-		ammo: 30,
-		maxAmmo: 30,
-		fireRate: 20,
-		reloadTime: 10,
+		dmg: 110,
+		ammo: 1,
+		maxAmmo: 1,
+		reloadTime: 0,
+		reloadSpeed: 7500,
+		fireRate: 92,
+		spread: [ 0, 0, 0 ],
+		spreadIndex: 0,
 		width: 30,
 		length: 90,
 		yOffset: 55,
 		holdDist: 5,
+	
+		bSpeed: 2,
+		bWidth: 24,
+		bHeight: 24,
+		bRandScale: [0, 0],
+		cAcc: 12,
+		maxLife: 800,
+		bulletsPerShot: 1,
+		pierceCount: 1,
+		bounce: true,
+		distBased: false,
+		explodeOnDeath: true,
+		bDist: 48,
+		bTrail: 0,
+		bSprite: 0,
+		glowWidth: 50,
+		glowHeight: 100,
+		shake: 0.4,
 		lastShot: 0,
 	}
 
@@ -84,6 +128,7 @@ io.on("connection", (socket: Socket) => {
 		angle: 0,
 		x: 0,
 		y: 0,
+		spawnProtection: 0,
 		nameYOffset: 0,
 		dead: true,
 		type: "player",
@@ -160,11 +205,16 @@ io.on("connection", (socket: Socket) => {
 		]);
 		socket.emit("add", JSON.stringify(player));
 	});
+	socket.on("sw", (currentWeapon) => {
+		player.currentWeapon = currentWeapon
+	});
+	socket.on("r", () => {
+		socket.emit("r", player.currentWeapon)
+	});
 
 	//TODO: socket.emit stuff
 	//socket.emit("upd", {})  //updateUserValue
 	//socket.emit("2", {})   //someoneShot
-	//socket.emit("r", {})   //currentWeapon
 	//socket.emit("jum", {}) //otherJump
 	//socket.emit("tprt", { indx: 0, newX: 0, newY: 0 })
 
@@ -172,7 +222,7 @@ io.on("connection", (socket: Socket) => {
 	socket.on("0", (targetF) => { //mouse pos
 		//console.log(targetF)
 	});
-	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => { //mouse inputs
+	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => { //bullet info
 		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);
 	});
 	socket.on("4", (data) => { //keyboard inputs
@@ -182,12 +232,6 @@ io.on("connection", (socket: Socket) => {
 		let inputNumber = data.isn
 		let space = data.s
 		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space);
-	});
-	socket.on("sw", (currentWeapon) => { //switch weapon
-		//console.log(currentWeapon)
-	});
-	socket.on("r", () => { //reload
-
 	});
 });
 

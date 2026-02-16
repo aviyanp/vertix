@@ -2469,6 +2469,7 @@ function receiveServerData(a) {
   if (!gameOver) {
     for (var d = 0; d < gameObjects.length; ++d) {
       if (gameObjects[d].type == "player") {
+        //TODO: figure this out
         gameObjects[d].onScreen = false;
       }
     }

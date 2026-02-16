@@ -142,7 +142,7 @@ io.on("connection", (socket: Socket) => {
 
 	socket.conn.on("packet", ({ type, data }) => {
 		//if (data?.includes("ping1") || data?.includes("hdt") || data?.includes('2["0",')) return;
-		console.log(type, data);
+		//console.log(type, data);
 	});
 
 	socket.on("cht", (msg, type) => {
@@ -158,7 +158,7 @@ io.on("connection", (socket: Socket) => {
 		player.classIndex = client.classIndex ? client.classIndex : player.classIndex
 		if (init) return;
 
-				player.dead = false;
+		player.dead = false;
 		player.health = 100;
 		player.angle = 0;
 		player.x = 128;
@@ -204,17 +204,23 @@ io.on("connection", (socket: Socket) => {
 		};
 
 		socket.emit("gameSetup", JSON.stringify(gameSetup), true, true);
-		socket.emit("rsd", [
+		io.emit("rsd", [
 			5,
 			player.index,
 			player.x,
 			player.y,
 			player.angle,
 		]);
-		socket.emit("add", JSON.stringify(player));
+		io.emit("add", JSON.stringify(player));
 	});
 	socket.on("ftc", (playerIdx) => {
-		socket.emit("add", JSON.stringify(players[playerIdx]));
+		io.emit("rsd", [
+			5,
+			players[playerIdx].index,
+			players[playerIdx].x,
+			players[playerIdx].y,
+			players[playerIdx].angle,
+		]);
 	});
 	socket.on("disconnect", () => {
 		io.emit("rem", player.index);

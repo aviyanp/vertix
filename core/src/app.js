@@ -1808,7 +1808,12 @@ function likePlayerStat(a) {
 function updateVoteStats(a) {
   document.getElementById("votesText" + a.i).innerHTML = a.n + ": " + a.v;
 }
-function showESCMenu() { }
+function showESCMenu() {
+  deactiveAllAnimTexts();
+  gameStart = false;
+  hideUI(false);
+  document.getElementById("startMenuWrapper").style.display = "block";
+}
 var buttonCount = 0;
 function showStatTable(a, b, d, e, f, h) {
   buttonCount = 0;

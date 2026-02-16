@@ -108,9 +108,11 @@ io.on("connection", (socket: Socket) => {
 	}
 
 	let player = {
+		id: 0,
+		room: "DEV",
 		index: players.length,
 		name: "Guest_" + JSON.stringify(players.length),
-		account: false,
+		account: { clan: "" },
 		classIndex: 0,
 		currentWeapon: 0,
 		weapons: [ smg, grenades ],
@@ -136,13 +138,10 @@ io.on("connection", (socket: Socket) => {
 	};
 	players.push(player)
 
-	socket.emit("welcome", { id: 0, room: "DEV" }, {});
-	socket.on("create", (room, servPass, lgKey, userName) => {
-
-	})
+	socket.emit("welcome", { id: player.id, room: player.room, name: player.name, classIndex: player.classIndex }, true);
 
 	socket.conn.on("packet", ({ type, data }) => {
-		if (data?.includes("ping1") || data?.includes("hdt") || data?.includes('2["0",')) return;
+		//if (data?.includes("ping1") || data?.includes("hdt") || data?.includes('2["0",')) return;
 		console.log(type, data);
 	});
 
@@ -153,19 +152,13 @@ io.on("connection", (socket: Socket) => {
 	socket.on("ping1", () => {
 		socket.emit("pong1");
 	});
-	socket.on("gotit", (lobby, unknown, currentTime) => {
-		console.log("gotit", lobby, unknown, currentTime);
-	});
-	socket.on("ftc", (playerIdx) => {
-		socket.emit("add", JSON.stringify(players[playerIdx]));
-	});
-	socket.on("disconnect", () => {
-		io.emit("rem", player.index);
-		players.splice(players.indexOf(player), 1);
-		console.log("disconnected");
-	});
-	socket.on("respawn", () => {
-		player.dead = false;
+	socket.on("gotit", (client, init, currentTime) => {
+		console.log("gotit", client, init, currentTime);
+		player.name = client.name ? client.name : player.name
+		player.classIndex = client.classIndex ? client.classIndex : player.classIndex
+		if (init) return;
+
+				player.dead = false;
 		player.health = 100;
 		player.angle = 0;
 		player.x = 128;
@@ -181,9 +174,22 @@ io.on("connection", (socket: Socket) => {
 					desc2: "",
 					teams: false,
 				},
-				clutter: [],
+				clutter: [{
+					i: 0,
+					x: 128 + tileScale,
+					y: 128,
+					w: 64,
+					h: 64,
+					active: true,
+				}],
 				genData: gameMap,
-				pickups: [],
+				pickups: [{
+					i: 0,
+					x: 128,
+					y: 128 + tileScale,
+					scale: 64,
+					active: true
+				}],
 				width: (gameMap.width - 4) * tileScale,
 				height: (gameMap.height - 4) * tileScale,
 			},
@@ -197,7 +203,7 @@ io.on("connection", (socket: Socket) => {
 			you: player
 		};
 
-		socket.emit("gameSetup", JSON.stringify(gameSetup), true, true,);
+		socket.emit("gameSetup", JSON.stringify(gameSetup), true, true);
 		socket.emit("rsd", [
 			5,
 			player.index,
@@ -206,6 +212,17 @@ io.on("connection", (socket: Socket) => {
 			player.angle,
 		]);
 		socket.emit("add", JSON.stringify(player));
+	});
+	socket.on("ftc", (playerIdx) => {
+		socket.emit("add", JSON.stringify(players[playerIdx]));
+	});
+	socket.on("disconnect", () => {
+		io.emit("rem", player.index);
+		players.splice(players.indexOf(player), 1);
+		console.log("disconnected");
+	});
+	socket.on("respawn", () => {
+		socket.emit("welcome", { id: player.id, room: player.room, name: player.name, classIndex: player.classIndex }, false);
 	});
 	socket.on("sw", (currentWeapon) => {
 		player.currentWeapon = currentWeapon
@@ -235,6 +252,9 @@ io.on("connection", (socket: Socket) => {
 		let space = data.s
 		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space);
 	});
+	socket.on("create", (lobby) => {
+
+	})
 });
 
 io.listen(1119);

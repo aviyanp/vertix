@@ -1,5 +1,5 @@
 import * as zip from "@zip.js/zip.js";
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 
 var playerName;
 var playerClassIndex;
@@ -240,7 +240,7 @@ window.onload = function() {
     $.get("/getIP", function(a) {
       port = a.port;
       if (!socket) {
-        socket = io.connect(
+        socket = io(
           "http://" + (devTest ? "localhost" : a.ip) + ":" + a.port,
           {
             reconnection: true,
@@ -1313,7 +1313,19 @@ function receivePing() {
   pingText.innerHTML = "PING " + a;
 }
 var pingInterval = null;
+/**
+ * 
+ * @param {Socket} a 
+ */
 function setupSocket(a) {
+  a.onAny((event, ...args) => {
+    if (["pong1"].includes(event)) return;
+    console.info("%c <= ", "background:#FF6A19;color:#000", event, args);
+  });
+  a.onAnyOutgoing((event, ...args) => {
+    if (["ping1", "0", "4"].includes(event)) return;
+    console.info("%c => ", "background:#7F7;color:#000", event, args)
+  })
   a.on("pong1", receivePing);
   if (pingInterval != null) {
     clearInterval(pingInterval);
@@ -2470,7 +2482,7 @@ function receiveServerData(a) {
     for (var d = 0; d < gameObjects.length; ++d) {
       if (gameObjects[d].type == "player") {
         //TODO: figure this out
-        gameObjects[d].onScreen = false;
+        gameObjects[d].onScreen = true; // supposed to be false to not show players that don't have active position/angle data etc, but for testing, its true
       }
     }
     for (d = 0; d < a.length;) {

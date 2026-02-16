@@ -204,6 +204,8 @@ io.on("connection", (socket: Socket) => {
 		};
 
 		socket.emit("gameSetup", JSON.stringify(gameSetup), true, true);
+		
+		io.emit("add", JSON.stringify(player));
 		io.emit("rsd", [
 			5,
 			player.index,
@@ -211,7 +213,6 @@ io.on("connection", (socket: Socket) => {
 			player.y,
 			player.angle,
 		]);
-		io.emit("add", JSON.stringify(player));
 	});
 	socket.on("ftc", (playerIdx) => {
 		io.emit("rsd", [
@@ -244,12 +245,25 @@ io.on("connection", (socket: Socket) => {
 	//socket.emit("tprt", { indx: 0, newX: 0, newY: 0 })
 
 	//TODO: socket.on stuff
-	socket.on("0", (targetF) => { //mouse pos
+	socket.on("0", (targetF) => { //mouse pos/angle?
 		//console.log(targetF)
 	});
 	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => { //bullet info
 		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);
 	});
+	// example
+	/*
+[
+    {
+        "hdt": 0,
+        "vdt": 0,
+        "ts": 1771275940411,
+        "isn": 391,
+        "s": 0,
+        "delta": 33
+    }
+]
+	*/
 	socket.on("4", (data) => { //keyboard inputs
 		let horizontalDT = data.hdt
 		let verticalDT = data.vdt

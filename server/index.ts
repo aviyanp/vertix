@@ -146,8 +146,16 @@ io.on("connection", (socket: Socket) => {
 	});
 
 	socket.on("cht", (msg, type) => {
-		socket.emit("cht", [-1, "blehhhhh"]);
-		socket.emit("5", "woah!!!");
+		if (msg.includes("!sync")) {
+			io.emit("rsd", players.map(player => [
+				5,
+				player.index,
+				player.x,
+				player.y,
+				player.angle,
+			]).flat());
+			socket.emit("cht", [-1, "synced"]);
+		}
 	});
 	socket.on("ping1", () => {
 		socket.emit("pong1");
@@ -206,23 +214,23 @@ io.on("connection", (socket: Socket) => {
 		socket.emit("gameSetup", JSON.stringify(gameSetup), true, true);
 		
 		io.emit("add", JSON.stringify(player));
-		io.emit("rsd", [
+		io.emit("rsd", players.map(player => [
 			5,
 			player.index,
 			player.x,
 			player.y,
 			player.angle,
-		]);
+		]).flat());
 	});
-	socket.on("ftc", (playerIdx) => {
-		io.emit("rsd", [
-			5,
-			players[playerIdx].index,
-			players[playerIdx].x,
-			players[playerIdx].y,
-			players[playerIdx].angle,
-		]);
-	});
+	// socket.on("ftc", (playerIdx) => {
+	// 	io.emit("rsd", [
+	// 		5,
+	// 		players[playerIdx].index,
+	// 		players[playerIdx].x,
+	// 		players[playerIdx].y,
+	// 		players[playerIdx].angle,
+	// 	]);
+	// });
 	socket.on("disconnect", () => {
 		io.emit("rem", player.index);
 		players.splice(players.indexOf(player), 1);

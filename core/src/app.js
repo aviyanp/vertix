@@ -2554,10 +2554,11 @@ function receiveServerData(a) {
               a /= e;
               b /= e;
             }
-            gameObjects[d].oldX = gameObjects[d].x;
-            gameObjects[d].oldY = gameObjects[d].y;
-            gameObjects[d].x += a * gameObjects[d].speed * thisInput[f].delta;
-            gameObjects[d].y += b * gameObjects[d].speed * thisInput[f].delta;
+            //TODO: double check if this is a real fix
+            //gameObjects[d].oldX = gameObjects[d].x;
+            //gameObjects[d].oldY = gameObjects[d].y;
+            //gameObjects[d].x += a * gameObjects[d].speed * thisInput[f].delta;
+            //gameObjects[d].y += b * gameObjects[d].speed * thisInput[f].delta;
             wallCol(gameObjects[d]);
             f++;
           }
@@ -2987,12 +2988,12 @@ function updateGameLoop() {
   var b = horizontalDT;
   var d = verticalDT;
   var e = mathSQRT(horizontalDT * horizontalDT + verticalDT * verticalDT);
-  if (e != 0) {
-    b /= e;
-    d /= e;
-  }
+  //if (e != 0) {
+  //  b /= e;
+  //  d /= e;
+  //}
   if (clientPrediction) {
-    for (e = 0; e < gameObjects.length; e++) {
+    for (let e = 0; e < gameObjects.length; e++) {
       if (gameObjects[e].type == "player") {
         if (gameObjects[e].index == player.index) {
           gameObjects[e].oldX = gameObjects[e].x;
@@ -3037,8 +3038,8 @@ function updateGameLoop() {
         }
         if (gameObjects[e].index == player.index && !gameOver) {
           sendData = {
-            hdt: horizontalDT / 2,
-            vdt: verticalDT / 2,
+            hdt: b,
+            vdt: d,
             ts: currentTime,
             isn: inputNumber,
             s: a,

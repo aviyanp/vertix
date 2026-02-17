@@ -283,11 +283,11 @@ io.on("connection", (socket: Socket) => {
 		let inputNumber = data.isn
 		let space = data.s
 		let delta = data.delta
-		var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
-		if (e != 0) {
-			horizontalDT /= e;
-			verticalDT /= e;
-		}
+		//var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
+		//if (e != 0) {
+		//	horizontalDT /= e;
+		//	verticalDT /= e;
+		//}
 	  player.oldX = player.x;
     player.oldY = player.y;
 		player.x += horizontalDT * player.speed * delta;
@@ -303,7 +303,7 @@ io.on("connection", (socket: Socket) => {
 			player.y,
 			player.angle,
 		]).flat());
-		console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space, delta);
+		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space, delta);
 	});
 	socket.on("create", (lobby) => {
 

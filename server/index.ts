@@ -130,10 +130,13 @@ io.on("connection", (socket: Socket) => {
 		angle: 0,
 		x: 0,
 		y: 0,
+		oldX: 0,
+		oldY: 0,
 		spawnProtection: 0,
 		nameYOffset: 0,
 		dead: true,
 		type: "player",
+		targetF: 0,
 		//team: "blue/red",
 	};
 	players.push(player)
@@ -254,6 +257,7 @@ io.on("connection", (socket: Socket) => {
 
 	//TODO: socket.on stuff
 	socket.on("0", (targetF) => { //mouse pos/angle?
+		player.targetF = targetF
 		//console.log(targetF)
 	});
 	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => { //bullet info
@@ -278,7 +282,28 @@ io.on("connection", (socket: Socket) => {
 		let currentTime = data.ts
 		let inputNumber = data.isn
 		let space = data.s
-		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space);
+		let delta = data.delta
+		var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
+		if (e != 0) {
+			horizontalDT /= e;
+			verticalDT /= e;
+		}
+	  player.oldX = player.x;
+    player.oldY = player.y;
+		player.x += horizontalDT * player.speed * delta;
+		player.y += verticalDT * player.speed * delta;
+		player.angle = ((player.targetF + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
+		//wallCol(player);
+		player.x = Math.round(player.x);
+    player.y = Math.round(player.y);
+		io.emit("rsd", players.map(player => [
+			5,
+			player.index,
+			player.x,
+			player.y,
+			player.angle,
+		]).flat());
+		console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space, delta);
 	});
 	socket.on("create", (lobby) => {
 

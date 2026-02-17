@@ -2481,8 +2481,7 @@ function receiveServerData(a) {
   if (!gameOver) {
     for (var d = 0; d < gameObjects.length; ++d) {
       if (gameObjects[d].type == "player") {
-        //TODO: figure this out
-        gameObjects[d].onScreen = true; // supposed to be false to not show players that don't have active position/angle data etc, but for testing, its true
+        gameObjects[d].onScreen = false;
       }
     }
     for (d = 0; d < a.length;) {
@@ -3045,9 +3044,9 @@ function updateGameLoop() {
             s: a,
           };
           inputNumber++;
-          socket.emit("4", sendData);
           sendData.delta = delta;
           thisInput.push(sendData);
+          socket.emit("4", sendData);
           if (userScroll != 0 && !gameOver) {
             playerSwapWeapon(gameObjects[e], userScroll);
             userScroll = 0;

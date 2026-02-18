@@ -2523,9 +2523,10 @@ function receiveServerData(a) {
             getCurrentWeapon(tmpUser).front = true;
           }
         }
-        if (b > 5) {
-          tmpUser.nameYOffset = a[5 + d];
-        }
+        //TODO: nameYOffset for other players
+        //if (b > 5) {
+        //  tmpUser.nameYOffset = a[5 + d];
+        //}
         tmpUser.onScreen = true;
       } else {
         fetchUserWithIndex(a[1 + d]);
@@ -2546,19 +2547,19 @@ function receiveServerData(a) {
           } else {
             a = thisInput[f].hdt;
             b = thisInput[f].vdt;
-            e = mathSQRT(
-              thisInput[f].hdt * thisInput[f].hdt +
-              thisInput[f].vdt * thisInput[f].vdt
-            );
-            if (e != 0) {
-              a /= e;
-              b /= e;
-            }
+            //e = mathSQRT(
+            //  thisInput[f].hdt * thisInput[f].hdt +
+            //  thisInput[f].vdt * thisInput[f].vdt
+            //);
+            //if (e != 0) {
+            //  a /= e;
+            //  b /= e;
+            //}
             //TODO: double check if this is a real fix
-            //gameObjects[d].oldX = gameObjects[d].x;
-            //gameObjects[d].oldY = gameObjects[d].y;
-            //gameObjects[d].x += a * gameObjects[d].speed * thisInput[f].delta;
-            //gameObjects[d].y += b * gameObjects[d].speed * thisInput[f].delta;
+            gameObjects[d].oldX = gameObjects[d].x;
+            gameObjects[d].oldY = gameObjects[d].y;
+            gameObjects[d].x += a * gameObjects[d].speed * thisInput[f].delta;
+            gameObjects[d].y += b * gameObjects[d].speed * thisInput[f].delta;
             wallCol(gameObjects[d]);
             f++;
           }
@@ -2987,7 +2988,7 @@ function updateGameLoop() {
   }
   var b = horizontalDT;
   var d = verticalDT;
-  var e = mathSQRT(horizontalDT * horizontalDT + verticalDT * verticalDT);
+  //var e = mathSQRT(horizontalDT * horizontalDT + verticalDT * verticalDT);
   //if (e != 0) {
   //  b /= e;
   //  d /= e;

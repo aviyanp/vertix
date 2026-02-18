@@ -296,12 +296,13 @@ io.on("connection", (socket: Socket) => {
 		//wallCol(player);
 		player.x = Math.round(player.x);
     player.y = Math.round(player.y);
-		io.emit("rsd", players.map(player => [
-			5,
-			player.index,
-			player.x,
-			player.y,
-			player.angle,
+		io.emit("rsd", players.map(pl => [
+			6,
+			pl.index,
+			pl.x,
+			pl.y,
+			pl.angle,
+			inputNumber,
 		]).flat());
 		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space, delta);
 	});

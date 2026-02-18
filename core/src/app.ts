@@ -1,3 +1,4 @@
+//@ts-nocheck
 import * as zip from "@zip.js/zip.js";
 import { io, Socket } from "socket.io-client";
 
@@ -7,7 +8,7 @@ var playerType;
 var healthBarWidth;
 var playerNameInput = document.getElementById("playerNameInput");
 var classInput = document.getElementById("classSelect");
-var socket;
+var socket: Socket | undefined;
 var reason;
 var animLoopHandle;
 var mobile = false;
@@ -1313,11 +1314,7 @@ function receivePing() {
   pingText.innerHTML = "PING " + a;
 }
 var pingInterval = null;
-/**
- * 
- * @param {Socket} a 
- */
-function setupSocket(a) {
+function setupSocket(a: Socket) {
   a.onAny((event, ...args) => {
     if (["pong1"].includes(event)) return;
     console.info("%c <= ", "background:#FF6A19;color:#000", event, args);

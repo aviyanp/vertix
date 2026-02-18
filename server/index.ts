@@ -1,7 +1,7 @@
-import Fastify from "fastify";
 import path from "node:path";
-import statc from "@fastify/static";
 import cors from "@fastify/cors";
+import statc from "@fastify/static";
+import Fastify from "fastify";
 import { Server, type Socket } from "socket.io";
 
 const server = Fastify({
@@ -11,8 +11,8 @@ const server = Fastify({
 	},
 });
 server.register(cors, {
-	origin: /localhost:1118|localhost:1119/
-})
+	origin: /localhost:1118|localhost:1119/,
+});
 server.register(statc, {
 	root: path.join(import.meta.dirname, "..", "public"),
 });
@@ -26,11 +26,12 @@ server.listen({ port: 1118 });
 const io = new Server({
 	cors: {
 		origin: "http://localhost:1118",
-		methods: ["GET"]
-	}
+		methods: ["GET"],
+	},
 });
 
 let players = [];
+// biome-ignore format: temp map data
 let gameMap = { "width": 16, "height": 16, "data": [255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255] };
 let tileScale = 256;
 
@@ -45,13 +46,13 @@ io.on("connection", (socket: Socket) => {
 		reloadTime: 0,
 		reloadSpeed: 800,
 		fireRate: 143,
-		spread: [ 0, 0, 0 ],
+		spread: [0, 0, 0],
 		spreadIndex: 0,
 		width: 30,
 		length: 90,
 		yOffset: 55,
 		holdDist: 5,
-	
+
 		bSpeed: 6,
 		bWidth: 8,
 		bHeight: 18,
@@ -70,7 +71,7 @@ io.on("connection", (socket: Socket) => {
 		glowHeight: 100,
 		shake: 0.4,
 		lastShot: 0,
-	}
+	};
 
 	let grenades = {
 		weaponIndex: 5,
@@ -80,13 +81,13 @@ io.on("connection", (socket: Socket) => {
 		reloadTime: 0,
 		reloadSpeed: 7500,
 		fireRate: 92,
-		spread: [ 0, 0, 0 ],
+		spread: [0, 0, 0],
 		spreadIndex: 0,
 		width: 30,
 		length: 90,
 		yOffset: 55,
 		holdDist: 5,
-	
+
 		bSpeed: 2,
 		bWidth: 24,
 		bHeight: 24,
@@ -105,7 +106,7 @@ io.on("connection", (socket: Socket) => {
 		glowHeight: 100,
 		shake: 0.4,
 		lastShot: 0,
-	}
+	};
 
 	let player = {
 		id: 0,
@@ -115,7 +116,7 @@ io.on("connection", (socket: Socket) => {
 		account: { clan: "" },
 		classIndex: 0,
 		currentWeapon: 0,
-		weapons: [ smg, grenades ],
+		weapons: [smg, grenades],
 		health: 0,
 		height: 100,
 		width: 50,
@@ -139,9 +140,18 @@ io.on("connection", (socket: Socket) => {
 		targetF: 0,
 		//team: "blue/red",
 	};
-	players.push(player)
+	players.push(player);
 
-	socket.emit("welcome", { id: player.id, room: player.room, name: player.name, classIndex: player.classIndex }, true);
+	socket.emit(
+		"welcome",
+		{
+			id: player.id,
+			room: player.room,
+			name: player.name,
+			classIndex: player.classIndex,
+		},
+		true,
+	);
 
 	socket.conn.on("packet", ({ type, data }) => {
 		//if (data?.includes("ping1") || data?.includes("hdt") || data?.includes('2["0",')) return;
@@ -150,13 +160,12 @@ io.on("connection", (socket: Socket) => {
 
 	socket.on("cht", (msg, type) => {
 		if (msg.includes("!sync")) {
-			io.emit("rsd", players.map(player => [
-				5,
-				player.index,
-				player.x,
-				player.y,
-				player.angle,
-			]).flat());
+			io.emit(
+				"rsd",
+				players
+					.map((player) => [5, player.index, player.x, player.y, player.angle])
+					.flat(),
+			);
 			socket.emit("cht", [-1, "synced"]);
 		}
 	});
@@ -165,8 +174,10 @@ io.on("connection", (socket: Socket) => {
 	});
 	socket.on("gotit", (client, init, currentTime) => {
 		console.log("gotit", client, init, currentTime);
-		player.name = client.name ? client.name : player.name
-		player.classIndex = client.classIndex ? client.classIndex : player.classIndex
+		player.name = client.name ? client.name : player.name;
+		player.classIndex = client.classIndex
+			? client.classIndex
+			: player.classIndex;
 		if (init) return;
 
 		player.dead = false;
@@ -185,22 +196,26 @@ io.on("connection", (socket: Socket) => {
 					desc2: "",
 					teams: false,
 				},
-				clutter: [{
-					i: 0,
-					x: 128 + tileScale,
-					y: 128,
-					w: 64,
-					h: 64,
-					active: true,
-				}],
+				clutter: [
+					{
+						i: 0,
+						x: 128 + tileScale,
+						y: 128,
+						w: 64,
+						h: 64,
+						active: true,
+					},
+				],
 				genData: gameMap,
-				pickups: [{
-					i: 0,
-					x: 128,
-					y: 128 + tileScale,
-					scale: 64,
-					active: true
-				}],
+				pickups: [
+					{
+						i: 0,
+						x: 128,
+						y: 128 + tileScale,
+						scale: 64,
+						active: true,
+					},
+				],
 				width: (gameMap.width - 4) * tileScale,
 				height: (gameMap.height - 4) * tileScale,
 			},
@@ -211,19 +226,18 @@ io.on("connection", (socket: Socket) => {
 			tileScale: tileScale,
 
 			usersInRoom: players,
-			you: player
+			you: player,
 		};
 
 		socket.emit("gameSetup", JSON.stringify(gameSetup), true, true);
-		
+
 		io.emit("add", JSON.stringify(player));
-		io.emit("rsd", players.map(player => [
-			5,
-			player.index,
-			player.x,
-			player.y,
-			player.angle,
-		]).flat());
+		io.emit(
+			"rsd",
+			players
+				.map((player) => [5, player.index, player.x, player.y, player.angle])
+				.flat(),
+		);
 	});
 	// socket.on("ftc", (playerIdx) => {
 	// 	io.emit("rsd", [
@@ -240,13 +254,22 @@ io.on("connection", (socket: Socket) => {
 		console.log("disconnected");
 	});
 	socket.on("respawn", () => {
-		socket.emit("welcome", { id: player.id, room: player.room, name: player.name, classIndex: player.classIndex }, false);
+		socket.emit(
+			"welcome",
+			{
+				id: player.id,
+				room: player.room,
+				name: player.name,
+				classIndex: player.classIndex,
+			},
+			false,
+		);
 	});
 	socket.on("sw", (currentWeapon) => {
-		player.currentWeapon = currentWeapon
+		player.currentWeapon = currentWeapon;
 	});
 	socket.on("r", () => {
-		socket.emit("r", player.currentWeapon)
+		socket.emit("r", player.currentWeapon);
 	});
 
 	//TODO: socket.emit stuff
@@ -256,11 +279,13 @@ io.on("connection", (socket: Socket) => {
 	//socket.emit("tprt", { indx: 0, newX: 0, newY: 0 })
 
 	//TODO: socket.on stuff
-	socket.on("0", (targetF) => { //mouse pos/angle?
-		player.targetF = targetF
+	socket.on("0", (targetF) => {
+		//mouse pos/angle?
+		player.targetF = targetF;
 		//console.log(targetF)
 	});
-	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => { //bullet info
+	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => {
+		//bullet info
 		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);
 	});
 	// example
@@ -276,39 +301,37 @@ io.on("connection", (socket: Socket) => {
     }
 ]
 	*/
-	socket.on("4", (data) => { //keyboard inputs
-		let horizontalDT = data.hdt
-		let verticalDT = data.vdt
-		let currentTime = data.ts
-		let inputNumber = data.isn
-		let space = data.s
-		let delta = data.delta
+	socket.on("4", (data) => {
+		//keyboard inputs
+		let horizontalDT = data.hdt;
+		let verticalDT = data.vdt;
+		let currentTime = data.ts;
+		let inputNumber = data.isn;
+		let space = data.s;
+		let delta = data.delta;
 		//var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
 		//if (e != 0) {
 		//	horizontalDT /= e;
 		//	verticalDT /= e;
 		//}
-	  player.oldX = player.x;
-    player.oldY = player.y;
+		player.oldX = player.x;
+		player.oldY = player.y;
 		player.x += horizontalDT * player.speed * delta;
 		player.y += verticalDT * player.speed * delta;
-		player.angle = ((player.targetF + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
+		player.angle =
+			((player.targetF + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
 		//wallCol(player);
 		player.x = Math.round(player.x);
-    player.y = Math.round(player.y);
-		io.emit("rsd", players.map(pl => [
-			6,
-			pl.index,
-			pl.x,
-			pl.y,
-			pl.angle,
-			inputNumber,
-		]).flat());
+		player.y = Math.round(player.y);
+		io.emit(
+			"rsd",
+			players
+				.map((pl) => [6, pl.index, pl.x, pl.y, pl.angle, inputNumber])
+				.flat(),
+		);
 		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space, delta);
 	});
-	socket.on("create", (lobby) => {
-
-	})
+	socket.on("create", (lobby) => {});
 });
 
 io.listen(1119);

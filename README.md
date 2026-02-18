@@ -1,3 +1,5 @@
-total mess, completely broken, messy code, ..
+total mess, ~~completely~~ mostly broken, messy code, ..
 
-to run: pnpm i, pnpm dev, http://localhost:1118.
+to run: `pnpm i`, `pnpm dev`, http://localhost:1118.
+
+to format: `pnpm biom format --write`

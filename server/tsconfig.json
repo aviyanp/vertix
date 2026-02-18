@@ -1,13 +1,13 @@
 {
-  "compilerOptions": {
-    "target": "esnext",
-    "module": "nodenext",
-    "noEmit": true,
-    "strict": true,
-    "allowJs": true,
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
-    "verbatimModuleSyntax": true,
-    "resolveJsonModule": true
-  }
+	"compilerOptions": {
+		"target": "esnext",
+		"module": "nodenext",
+		"noEmit": true,
+		"strict": true,
+		"allowJs": true,
+		"allowImportingTsExtensions": true,
+		"rewriteRelativeImportExtensions": true,
+		"verbatimModuleSyntax": true,
+		"resolveJsonModule": true
+	}
 }

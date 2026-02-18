@@ -1,15 +1,15 @@
 {
-  "name": "vertix",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "pnpm run --parallel --reporter-hide-prefix --color --recursive dev"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@biomejs/biome": "2.3.15"
-  }
+	"name": "vertix",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"dev": "pnpm run --parallel --reporter-hide-prefix --color --recursive dev"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"devDependencies": {
+		"@biomejs/biome": "2.3.15"
+	}
 }

@@ -2553,7 +2553,7 @@ function receiveServerData(a) {
 						gameObjects[d].oldY = gameObjects[d].y;
 						gameObjects[d].x += a * gameObjects[d].speed * thisInput[f].delta;
 						gameObjects[d].y += b * gameObjects[d].speed * thisInput[f].delta;
-						wallCol(gameObjects[d]);
+						wallCol(gameObjects[d], gameMap, gameObjects);
 						f++;
 					}
 				}
@@ -2996,7 +2996,7 @@ function updateGameLoop() {
 						gameObjects[e].x += b * gameObjects[e].speed * delta;
 						gameObjects[e].y += d * gameObjects[e].speed * delta;
 					}
-					wallCol(gameObjects[e]);
+					wallCol(gameObjects[e], gameMap, gameObjects);
 					gameObjects[e].x = mathRound(gameObjects[e].x);
 					gameObjects[e].y = mathRound(gameObjects[e].y);
 					gameObjects[e].angle =
@@ -3146,7 +3146,7 @@ function updateGameLoop() {
 		context.globalAlpha = 0.25;
 	}
 }
-function wallCol(a) {
+export function wallCol(a, gameMap, gameObjects) {
 	if (!a.dead) {
 		var b = null;
 		for (var d = (a.nameYOffset = 0); d < gameMap.tiles.length; ++d) {

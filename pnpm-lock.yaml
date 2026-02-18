@@ -32,6 +32,9 @@ importers:
       '@fastify/static':
         specifier: ^8.2.0
         version: 8.2.0
+      core:
+        specifier: workspace:*
+        version: link:../core
       fastify:
         specifier: ^5.3.3
         version: 5.3.3

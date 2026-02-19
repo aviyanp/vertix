@@ -641,9 +641,9 @@ function gameInput(a) {
 		screenHeight / 2 - b / 2 - mouseY,
 		screenWidth / 2 - mouseX,
 	);
-	target.f = target.f.round(2);
-	target.d = target.d.round(2);
-	target.dOffset = (target.d / 4).round(1);
+	target.f = utils.roundNumber(target.f, 2);
+	target.d = utils.roundNumber(target.d, 2);
+	target.dOffset = utils.roundNumber(target.d / 4, 1);
 	if (lastAngle != target.f || lastDist != target.d) {
 		targetChanged = true;
 	}
@@ -4105,7 +4105,7 @@ function shootBullet(a) {
 				getCurrentWeapon(a).spreadIndex = 0;
 			}
 			var d = getCurrentWeapon(a).spread[getCurrentWeapon(a).spreadIndex];
-			var d = (target.f + mathPI + d).round(2);
+			var d = utils.roundNumber(target.f + mathPI + d, 2);
 			var e = getCurrentWeapon(a).holdDist + getCurrentWeapon(a).bDist;
 			var f = mathRound(a.x + e * mathCOS(d));
 			var e = mathRound(

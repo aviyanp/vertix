@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import statc from "@fastify/static";
 import Fastify from "fastify";
 import { Server, type Socket } from "socket.io";
-import { setupMap, wallCol, getCurrentWeapon } from "core/src/utils.ts";
+import { setupMap, wallCol, getCurrentWeapon, roundNumber } from "core/src/utils.ts";
 import { weapons } from "core/src/loadouts.ts";
 
 const server = Fastify({
@@ -231,7 +231,7 @@ io.on("connection", (socket: Socket) => {
 		}
 		var d =
 			getCurrentWeapon(player).spread[getCurrentWeapon(player).spreadIndex];
-		var d = (targetF + Math.PI + d).round(2);
+		var d = roundNumber((targetF + Math.PI + d), 2)
 		var e = getCurrentWeapon(player).holdDist + getCurrentWeapon(player).bDist;
 		var f = Math.round(x + e * Math.cos(d));
 		var e = Math.round(

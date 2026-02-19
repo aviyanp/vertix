@@ -12,8 +12,8 @@ export function setupMap(a, mapTileScale) {
 	var l = b.data.data || b.data;
 	for (var m = 0; m < b.width; m++) {
 		for (var k = 0; k < b.height; k++) {
-			var p = (b.width * k + m) << 2;
-			var p = l[p] + " " + l[p + 1] + " " + l[p + 2];
+			var tileDataBaseIdx = (b.width * k + m) << 2;
+			var p = l[tileDataBaseIdx] + " " + l[tileDataBaseIdx + 1] + " " + l[tileDataBaseIdx + 2];
 			var n = {
 				index: f,
 				scale: mapTileScale,
@@ -276,56 +276,55 @@ export function getCurrentWeapon(player) {
 		return null;
 	}
 }
-Number.prototype.round = function (a) {
-	return +this.toFixed(a);
-};
-var PI2 = Math.PI * 2;
-export function getAngleDifference(a, b) {
-	let anglDif = Math.abs(b - a) % PI2;
-	if (anglDif > Math.PI) {
-		return PI2 - anglDif;
-	} else {
-		return anglDif;
-	}
+export function roundNumber(num: number, fractionDigits: number) {
+	return +num.toFixed(fractionDigits)
 }
-export function jsonByteCount(a) {
-	return byteCount(JSON.stringify(a));
+export function getAngleDifference(angleA, angleB) {
+    let anglDif = Math.abs(angleB - angleA) % (Math.PI * 2);
+    if (anglDif > Math.PI) {
+        return (Math.PI * 2) - anglDif;
+    } else {
+        return anglDif;
+    }
 }
-export function byteCount(a) {
-	return encodeURI(a).split(/%..|./).length - 1;
+export function jsonByteCount(obj: object) {
+    return byteCount(JSON.stringify(obj));
 }
-export function getDistance(a, b, d, e) {
-	return Math.sqrt(Math.pow(d - a, 2) + Math.pow(e - b, 2));
+export function byteCount(str: string) {
+    return encodeURI(str).split(/%..|./).length - 1;
 }
-export function getAngle(a, b, d, e) {
-	return Math.atan2(e - b, d - a);
+export function getDistance(x1: number, y1: number, x2: number, y2: number) {
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 }
-export function shadeColor(a, b) {
-	var d = parseInt(a.substring(1, 3), 16);
-	var e = parseInt(a.substring(3, 5), 16);
-	var f = parseInt(a.substring(5, 7), 16);
-	var d = parseInt((d * (100 + b)) / 100);
-	var e = parseInt((e * (100 + b)) / 100);
-	var f = parseInt((f * (100 + b)) / 100);
-	var d = d < 255 ? d : 255;
-	var e = e < 255 ? e : 255;
-	var f = f < 255 ? f : 255;
-	var d = d.toString(16).length == 1 ? "0" + d.toString(16) : d.toString(16);
-	var e = e.toString(16).length == 1 ? "0" + e.toString(16) : e.toString(16);
-	var f = f.toString(16).length == 1 ? "0" + f.toString(16) : f.toString(16);
-	return "#" + d + e + f;
+export function getAngle(x1: number, y1: number, x2: number, y2: number) {
+    return Math.atan2(y2 - y1, x2 - x1);
 }
-export function randomFloat(a, b, d) {
-	return a + Math.random() * (b - a);
+export function shadeColor(hexColor: string, percent: number) {
+    var r = parseInt(hexColor.substring(1, 3), 16);
+    var g = parseInt(hexColor.substring(3, 5), 16);
+    var b = parseInt(hexColor.substring(5, 7), 16);
+    var r = (r * (100 + percent)) / 100;
+    var g = (g * (100 + percent)) / 100;
+    var b = (b * (100 + percent)) / 100;
+    var r = r < 255 ? r : 255;
+    var g = g < 255 ? g : 255;
+    var b = b < 255 ? b : 255;
+    var rstr = r.toString(16).length == 1 ? "0" + r.toString(16) : r.toString(16);
+    var gstr = g.toString(16).length == 1 ? "0" + g.toString(16) : g.toString(16);
+    var bstr = b.toString(16).length == 1 ? "0" + b.toString(16) : b.toString(16);
+    return "#" + rstr + gstr + bstr;
 }
-export function randomInt(a, b, d) {
-	return Math.floor(Math.random() * (b - a + 1)) + a;
+export function randomFloat(min: number, max: number) {
+    return min + Math.random() * (max - min);
 }
-export function linearInterpolate(a, b, d) {
-	var e = a - b;
-	if (e * e > d * d) {
-		return b + d;
-	} else {
-		return a;
-	}
+export function randomInt(min: number, max: number) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+export function linearInterpolate(current: number, target: number, step: number) {
+    var delta = current - target;
+    if (delta * delta > step * step) {
+        return target + step;
+    } else {
+        return current;
+    }
 }

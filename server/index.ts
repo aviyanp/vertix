@@ -137,8 +137,13 @@ io.on("connection", (socket: Socket) => {
 		if (msg.includes("!sync")) {
 			io.emit(
 				"rsd",
-				players
-					.flatMap((player) => [5, player.index, player.x, player.y, player.angle]),
+				players.flatMap((player) => [
+					5,
+					player.index,
+					player.x,
+					player.y,
+					player.angle,
+				]),
 			);
 			socket.emit("cht", [-1, "synced"]);
 			return;
@@ -155,8 +160,8 @@ io.on("connection", (socket: Socket) => {
 			? client.classIndex
 			: player.classIndex;
 		const currentClass = characterClasses[player.classIndex];
-		player.currentWeapon = 0 //currentClass.weaponIndexes[0];
-		player.weapons = [weapons[0], weapons[5]] //currentClass.weaponIndexes.map(i => weapons[i]);
+		player.currentWeapon = 0; //currentClass.weaponIndexes[0];
+		player.weapons = [weapons[0], weapons[5]]; //currentClass.weaponIndexes.map(i => weapons[i]);
 		player.health = currentClass.health;
 		player.height = currentClass.height;
 		player.width = currentClass.width;
@@ -185,8 +190,13 @@ io.on("connection", (socket: Socket) => {
 		io.emit("add", JSON.stringify(player));
 		io.emit(
 			"rsd",
-			players
-				.flatMap((player) => [5, player.index, player.x, player.y, player.angle]),
+			players.flatMap((player) => [
+				5,
+				player.index,
+				player.x,
+				player.y,
+				player.angle,
+			]),
 		);
 	});
 	// socket.on("ftc", (playerIdx) => {
@@ -297,8 +307,7 @@ io.on("connection", (socket: Socket) => {
 		player.y = Math.round(player.y);
 		io.emit(
 			"rsd",
-			players
-				.flatMap((pl) => [6, pl.index, pl.x, pl.y, pl.angle, inputNumber]),
+			players.flatMap((pl) => [6, pl.index, pl.x, pl.y, pl.angle, inputNumber]),
 		);
 		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space, delta);
 	});

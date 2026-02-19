@@ -2360,12 +2360,12 @@ function receiveServerData(a) {
 						a = thisInput[f].hdt;
 						b = thisInput[f].vdt;
 						e = mathSQRT(
-						  thisInput[f].hdt * thisInput[f].hdt +
-						  thisInput[f].vdt * thisInput[f].vdt
+							thisInput[f].hdt * thisInput[f].hdt +
+								thisInput[f].vdt * thisInput[f].vdt,
 						);
 						if (e != 0) {
-						  a /= e;
-						  b /= e;
+							a /= e;
+							b /= e;
 						}
 						gameObjects[d].oldX = gameObjects[d].x;
 						gameObjects[d].oldY = gameObjects[d].y;
@@ -2801,8 +2801,8 @@ function updateGameLoop() {
 	var d = verticalDT;
 	var e = mathSQRT(horizontalDT * horizontalDT + verticalDT * verticalDT);
 	if (e != 0) {
-	  b /= e;
-	  d /= e;
+		b /= e;
+		d /= e;
 	}
 	if (clientPrediction) {
 		for (let e = 0; e < gameObjects.length; e++) {

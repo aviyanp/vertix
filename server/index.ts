@@ -229,7 +229,9 @@ io.on("connection", (socket: Socket) => {
 		player.currentWeapon = currentWeapon;
 	});
 	socket.on("r", () => {
-		socket.emit("r", player.currentWeapon);
+		setTimeout(() => {
+			socket.emit("r", player.currentWeapon);
+		}, weapons[player.currentWeapon].reloadSpeed ?? 0);
 	});
 	socket.on("0", (targetF) => {
 		player.targetF = targetF;

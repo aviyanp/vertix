@@ -131,7 +131,7 @@ export function setupMap(a, mapTileScale) {
 		if (a.tiles[b].edgeTile) {
 			a.tiles[b].hasCollision = false;
 		} else if (!a.tiles[b].wall && a.tiles[b].hardPoint) {
-            /*
+			/*
 			if (
 				canPlaceFlag(a.tiles[b - h], true) &&
 				canPlaceFlag(a.tiles[b - 1], false)
@@ -204,77 +204,80 @@ function canPlaceFlag(a, b) {
 	}
 }
 export function wallCol(a, gameMap, gameObjects) {
-    if (!a.dead) {
-        var b = null;
-        for (var d = (a.nameYOffset = 0); d < gameMap.tiles.length; ++d) {
-            if (gameMap.tiles[d].wall && gameMap.tiles[d].hasCollision) {
-                b = gameMap.tiles[d];
-                if (
-                    a.x + a.width / 2 >= b.x &&
-                    a.x - a.width / 2 <= b.x + b.scale &&
-                    a.y >= b.y &&
-                    a.y <= b.y + b.scale
-                ) {
-                    if (a.oldX <= b.x) {
-                        a.x = b.x - a.width / 2 - 2;
-                    } else if (a.oldX - a.width / 2 >= b.x + b.scale) {
-                        a.x = b.x + b.scale + a.width / 2 + 2;
-                    }
-                    if (a.oldY <= b.y) {
-                        a.y = b.y - 2;
-                    } else if (a.oldY >= b.y + b.scale) {
-                        a.y = b.y + b.scale + 2;
-                    }
-                }
-                if (
-                    !b.hardPoint &&
-                    a.x > b.x &&
-                    a.x < b.x + b.scale &&
-                    a.y - a.jumpY - a.height * 0.85 > b.y - b.scale / 2 &&
-                    a.y - a.jumpY - a.height * 0.85 <= b.y
-                ) {
-                    a.nameYOffset = Math.round(
-                        a.y - a.jumpY - a.height * 0.85 - (b.y - b.scale / 2),
-                    );
-                }
-            }
-        }
-        for (d = 0; d < gameObjects.length; ++d) {
-            if (gameObjects[d].type == "clutter" && gameObjects[d].active) {
-                b = gameObjects[d];
-                if (
-                    b.hc &&
-                    //canSee(b.x - startX, b.y - startY, b.w, b.h) &&
-                    a.x + a.width / 2 >= b.x &&
-                    a.x - a.width / 2 <= b.x + b.w &&
-                    a.y >= b.y - b.h * b.tp &&
-                    a.y <= b.y
-                ) {
-                    if (a.oldX + a.width / 2 <= b.x) {
-                        a.x = b.x - a.width / 2 - 1;
-                    } else if (a.oldX - a.width / 2 >= b.x + b.w) {
-                        a.x = b.x + b.w + a.width / 2 + 1;
-                    }
-                    if (a.oldY >= b.y) {
-                        a.y = b.y + 1;
-                    } else if (a.oldY <= b.y - b.h * b.tp) {
-                        a.y = b.y - b.h * b.tp - 1;
-                    }
-                }
-            }
-        }
-        b = null;
-    }
+	if (!a.dead) {
+		var b = null;
+		for (var d = (a.nameYOffset = 0); d < gameMap.tiles.length; ++d) {
+			if (gameMap.tiles[d].wall && gameMap.tiles[d].hasCollision) {
+				b = gameMap.tiles[d];
+				if (
+					a.x + a.width / 2 >= b.x &&
+					a.x - a.width / 2 <= b.x + b.scale &&
+					a.y >= b.y &&
+					a.y <= b.y + b.scale
+				) {
+					if (a.oldX <= b.x) {
+						a.x = b.x - a.width / 2 - 2;
+					} else if (a.oldX - a.width / 2 >= b.x + b.scale) {
+						a.x = b.x + b.scale + a.width / 2 + 2;
+					}
+					if (a.oldY <= b.y) {
+						a.y = b.y - 2;
+					} else if (a.oldY >= b.y + b.scale) {
+						a.y = b.y + b.scale + 2;
+					}
+				}
+				if (
+					!b.hardPoint &&
+					a.x > b.x &&
+					a.x < b.x + b.scale &&
+					a.y - a.jumpY - a.height * 0.85 > b.y - b.scale / 2 &&
+					a.y - a.jumpY - a.height * 0.85 <= b.y
+				) {
+					a.nameYOffset = Math.round(
+						a.y - a.jumpY - a.height * 0.85 - (b.y - b.scale / 2),
+					);
+				}
+			}
+		}
+		for (d = 0; d < gameObjects.length; ++d) {
+			if (gameObjects[d].type == "clutter" && gameObjects[d].active) {
+				b = gameObjects[d];
+				if (
+					b.hc &&
+					//canSee(b.x - startX, b.y - startY, b.w, b.h) &&
+					a.x + a.width / 2 >= b.x &&
+					a.x - a.width / 2 <= b.x + b.w &&
+					a.y >= b.y - b.h * b.tp &&
+					a.y <= b.y
+				) {
+					if (a.oldX + a.width / 2 <= b.x) {
+						a.x = b.x - a.width / 2 - 1;
+					} else if (a.oldX - a.width / 2 >= b.x + b.w) {
+						a.x = b.x + b.w + a.width / 2 + 1;
+					}
+					if (a.oldY >= b.y) {
+						a.y = b.y + 1;
+					} else if (a.oldY <= b.y - b.h * b.tp) {
+						a.y = b.y - b.h * b.tp - 1;
+					}
+				}
+			}
+		}
+		b = null;
+	}
 }
 export function getCurrentWeapon(player) {
-	if (player.weapons != undefined && player.weapons[player.currentWeapon] != undefined) {
+	if (
+		player.weapons != undefined &&
+		player.weapons[player.currentWeapon] != undefined
+	) {
 		return player.weapons[player.currentWeapon];
 	} else {
 		return null;
 	}
 }
 Number.prototype.round = function (a) {
-    return +this.toFixed(a);
+	return +this.toFixed(a);
 };
 var PI2 = Math.PI * 2;
 export function getAngleDifference(a, b) {

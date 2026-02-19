@@ -2,19 +2,19 @@
 import * as zip from "@zip.js/zip.js";
 import { io, Socket } from "socket.io-client";
 import * as utils from "./utils.ts";
-	
+
 const {
-  wallCol,
-  getCurrentWeapon,
-  getAngleDifference,
-  jsonByteCount,
-  byteCount,
-  getDistance,
-  getAngle,
-  shadeColor,
-  randomFloat,
-  randomInt,
-  linearInterpolate
+	wallCol,
+	getCurrentWeapon,
+	getAngleDifference,
+	jsonByteCount,
+	byteCount,
+	getDistance,
+	getAngle,
+	shadeColor,
+	randomFloat,
+	randomInt,
+	linearInterpolate,
 } = utils;
 
 var playerName;

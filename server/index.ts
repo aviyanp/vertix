@@ -46,7 +46,7 @@ let clutter = [
 		h: 64,
 		active: true,
 	},
-]
+];
 let mapData = {
 	gameMode: {
 		code: "ffa",
@@ -70,8 +70,8 @@ let mapData = {
 	tiles: tiles,
 	width: (genData.width - 4) * mapTileScale,
 	height: (genData.height - 4) * mapTileScale,
-}
-setupMap(mapData, mapTileScale)
+};
+setupMap(mapData, mapTileScale);
 
 io.on("connection", (socket: Socket) => {
 	console.log("con", socket.id);
@@ -207,7 +207,7 @@ io.on("connection", (socket: Socket) => {
 			socket.emit("cht", [-1, "synced"]);
 			return;
 		}
-		io.emit("cht", ([ player.index, msg ]))
+		io.emit("cht", [player.index, msg]);
 	});
 	socket.on("ping1", () => {
 		socket.emit("pong1");
@@ -294,22 +294,26 @@ io.on("connection", (socket: Socket) => {
 	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => {
 		getCurrentWeapon(player).spreadIndex++;
 		if (
-			getCurrentWeapon(player).spreadIndex >= getCurrentWeapon(player).spread.length
+			getCurrentWeapon(player).spreadIndex >=
+			getCurrentWeapon(player).spread.length
 		) {
 			getCurrentWeapon(player).spreadIndex = 0;
 		}
-		var d = getCurrentWeapon(player).spread[getCurrentWeapon(player).spreadIndex];
+		var d =
+			getCurrentWeapon(player).spread[getCurrentWeapon(player).spreadIndex];
 		var d = (targetF + Math.PI + d).round(2);
 		var e = getCurrentWeapon(player).holdDist + getCurrentWeapon(player).bDist;
 		var f = Math.round(x + e * Math.cos(d));
-		var e = Math.round(y - getCurrentWeapon(player).yOffset - jumpY + e * Math.sin(d));
+		var e = Math.round(
+			y - getCurrentWeapon(player).yOffset - jumpY + e * Math.sin(d),
+		);
 		io.emit("2", {
 			i: player.index,
 			x: f,
 			y: e,
 			d: d,
 			si: -1,
-		})
+		});
 		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);
 	});
 	socket.on("4", (data) => {
@@ -331,7 +335,7 @@ io.on("connection", (socket: Socket) => {
 		player.y += verticalDT * player.speed * delta;
 		player.angle =
 			((player.targetF + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
-		wallCol(player, {tiles}, {clutter});
+		wallCol(player, { tiles }, { clutter });
 		player.x = Math.round(player.x);
 		player.y = Math.round(player.y);
 		io.emit(

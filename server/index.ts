@@ -252,18 +252,17 @@ io.on("connection", (socket: Socket) => {
 		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);
 	});
 	socket.on("4", (data) => {
-		//keyboard inputs
 		let horizontalDT = data.hdt;
 		let verticalDT = data.vdt;
-		let currentTime = data.ts;
+		//let currentTime = data.ts;
 		let inputNumber = data.isn;
 		let space = data.s;
 		let delta = data.delta;
-		//var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
-		//if (e != 0) {
-		//	horizontalDT /= e;
-		//	verticalDT /= e;
-		//}
+		var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
+		if (e != 0) {
+			horizontalDT /= e;
+			verticalDT /= e;
+		}
 		player.oldX = player.x;
 		player.oldY = player.y;
 		player.x += horizontalDT * player.speed * delta;

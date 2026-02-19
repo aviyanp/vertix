@@ -2359,14 +2359,14 @@ function receiveServerData(a) {
 					} else {
 						a = thisInput[f].hdt;
 						b = thisInput[f].vdt;
-						//e = mathSQRT(
-						//  thisInput[f].hdt * thisInput[f].hdt +
-						//  thisInput[f].vdt * thisInput[f].vdt
-						//);
-						//if (e != 0) {
-						//  a /= e;
-						//  b /= e;
-						//}
+						e = mathSQRT(
+						  thisInput[f].hdt * thisInput[f].hdt +
+						  thisInput[f].vdt * thisInput[f].vdt
+						);
+						if (e != 0) {
+						  a /= e;
+						  b /= e;
+						}
 						gameObjects[d].oldX = gameObjects[d].x;
 						gameObjects[d].oldY = gameObjects[d].y;
 						gameObjects[d].x += a * gameObjects[d].speed * thisInput[f].delta;
@@ -2799,11 +2799,11 @@ function updateGameLoop() {
 	}
 	var b = horizontalDT;
 	var d = verticalDT;
-	//var e = mathSQRT(horizontalDT * horizontalDT + verticalDT * verticalDT);
-	//if (e != 0) {
-	//  b /= e;
-	//  d /= e;
-	//}
+	var e = mathSQRT(horizontalDT * horizontalDT + verticalDT * verticalDT);
+	if (e != 0) {
+	  b /= e;
+	  d /= e;
+	}
 	if (clientPrediction) {
 		for (let e = 0; e < gameObjects.length; e++) {
 			if (gameObjects[e].type == "player") {

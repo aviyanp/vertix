@@ -603,19 +603,19 @@ var reenviar = true;
 var directionLock = false;
 var directions = [];
 var zipFileCloser;
-var c = document.getElementById("cvs");
-c.width = screenWidth;
-c.height = screenHeight;
-c.addEventListener("mousemove", gameInput, false);
-c.addEventListener("mousedown", mouseDown, false);
-c.addEventListener("drag", mouseDown, false);
-c.addEventListener("click", focusGame, false);
-c.addEventListener("mouseup", mouseUp, false);
+var mainCanvas = document.getElementById("cvs");
+mainCanvas.width = screenWidth;
+mainCanvas.height = screenHeight;
+mainCanvas.addEventListener("mousemove", gameInput, false);
+mainCanvas.addEventListener("mousedown", mouseDown, false);
+mainCanvas.addEventListener("drag", mouseDown, false);
+mainCanvas.addEventListener("click", focusGame, false);
+mainCanvas.addEventListener("mouseup", mouseUp, false);
 var lastAngle = 0;
 var lastDist = 0;
 var targetChanged = true;
 function focusGame(a) {
-	c.focus();
+	mainCanvas.focus();
 }
 let lastTarget;
 function gameInput(a) {
@@ -659,11 +659,11 @@ function mouseUp(a) {
 	a.stopPropagation();
 	keys.lm = 0;
 }
-if (c.addEventListener) {
-	c.addEventListener("mousewheel", gameScroll, false);
-	c.addEventListener("DOMMouseScroll", gameScroll, false);
+if (mainCanvas.addEventListener) {
+	mainCanvas.addEventListener("mousewheel", gameScroll, false);
+	mainCanvas.addEventListener("DOMMouseScroll", gameScroll, false);
 } else {
-	c.attachEvent("onmousewheel", gameScroll);
+	mainCanvas.attachEvent("onmousewheel", gameScroll);
 }
 var userScroll = 0;
 function gameScroll(a) {
@@ -807,7 +807,7 @@ function keyDown(a) {
 		}
 		keyChangeElement = keyToChange = null;
 		saveKeysToCookie();
-	} else if (c == document.activeElement) {
+	} else if (mainCanvas == document.activeElement) {
 		a.preventDefault();
 		keyMap[a.keyCode] = a.type == "keydown";
 		if (a.keyCode == 27 && gameStart) {
@@ -854,7 +854,7 @@ function keyDown(a) {
 		}
 	}
 }
-c.addEventListener("keyup", keyUp, false);
+mainCanvas.addEventListener("keyup", keyUp, false);
 function keyUp(a) {
 	a = a || event;
 	a.preventDefault();
@@ -905,7 +905,7 @@ function ChatManager() {
 		b = b.which || b.keyCode;
 		if (b === 27) {
 			a.value = "";
-			c.focus();
+			mainCanvas.focus();
 		}
 	});
 }
@@ -926,7 +926,7 @@ ChatManager.prototype.sendChat = function (a) {
 				player.team,
 			);
 			b.value = "";
-			c.focus();
+			mainCanvas.focus();
 		}
 	}
 };
@@ -937,7 +937,7 @@ function toggleTeamChat() {
 	}
 	currentChatType = chatTypes[chatTypeIndex];
 	document.getElementById("chatType").innerHTML = currentChatType;
-	c.focus();
+	mainCanvas.focus();
 }
 var profanityList =
 	"cunt whore shit fuck faggot nigger nigga dick vagina minge cock rape cum sex tits gay dumb penis clit pussy meatcurtain jizz prune douche wanker jerk".split(
@@ -1031,7 +1031,7 @@ function messageFromServer(a) {
 		console.log(b);
 	}
 }
-var context = c.getContext("2d");
+var context = mainCanvas.getContext("2d");
 var osCanvas = document.createElement("canvas");
 var graph = context;
 var mapCanvas = document.getElementById("mapc");
@@ -1233,6 +1233,7 @@ if (getCookie("targetFPS") != "") {
 	var fpsSelect = document.getElementById("fpsSelect");
 	fpsSelect.value = targetFPS;
 }
+window.pickedFps = pickedFps;
 function pickedFps(a) {
 	targetFPS = a.options[a.selectedIndex].value;
 	try {
@@ -1327,7 +1328,7 @@ function receivePing() {
 var pingInterval = null;
 function setupSocket(a: Socket) {
 	a.onAny((event, ...args) => {
-		if (["pong1"].includes(event)) return;
+		if (["pong1", "rsd"].includes(event)) return;
 		console.info("%c <= ", "background:#FF6A19;color:#000", event, args);
 	});
 	a.onAnyOutgoing((event, ...args) => {
@@ -1884,7 +1885,7 @@ function showStatTable(a, b, d, e, f, h) {
 					document.getElementById("voteModeContainer").appendChild(d);
 					d.onclick = (function (a, d) {
 						return function () {
-							c.focus();
+							mainCanvas.focus();
 							socket.emit("modeVote", a.indx);
 							for (var e = 0; e < b.length; ++e) {
 								if (
@@ -2139,7 +2140,7 @@ function addRowToStatTable(a, b) {
 			var m = a[f];
 			g.tmpCont = m;
 			g.onclick = function () {
-				c.focus();
+				mainCanvas.focus();
 				likePlayerStat(m.pos);
 				for (var a = 0; a < buttonCount; ++a) {
 					document
@@ -3056,8 +3057,8 @@ function resize() {
 		screenWidth / maxScreenWidth,
 		screenHeight / maxScreenHeight,
 	);
-	c.width = screenWidth;
-	c.height = screenHeight;
+	mainCanvas.width = screenWidth;
+	mainCanvas.height = screenHeight;
 	graph.setTransform(
 		a,
 		0,
@@ -6474,21 +6475,9 @@ function stillDustParticle(a, b, d) {
 	tmpParticle.active = true;
 }
 var then = Date.now();
-window.requestAnimFrame = (function () {
-	return (
-		window.requestAnimationFrame ||
-		window.webkitRequestAnimationFrame ||
-		window.mozRequestAnimationFrame ||
-		window.oRequestAnimationFrame ||
-		window.msRequestAnimationFrame ||
-		function (a, b) {
-			window.setTimeout(a, 1000 / targetFPS);
-		}
-	);
-})();
 let elapsed;
 function callUpdate() {
-	requestAnimFrame(callUpdate);
+	requestAnimationFrame(callUpdate);
 	currentTime = Date.now();
 	elapsed = currentTime - then;
 	if (elapsed > 1000 / targetFPS) {

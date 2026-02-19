@@ -1,6 +1,10 @@
 export const characterClasses = [
 	{
 		classN: "Triggerman",
+		health: 100,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [0, 5],
 		pWeapon: "Machine Gun",
 		sWeapon: "Grenade Launcher",
@@ -9,6 +13,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Detective",
+		health: 100,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [1, 5],
 		pWeapon: "Desert Eagle",
 		sWeapon: "Grenade Launcher",
@@ -17,6 +25,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Hunter",
+		health: 50,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [2, 7],
 		pWeapon: "Sniper",
 		sWeapon: "Machine Pistol",
@@ -25,6 +37,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Run 'N Gun",
+		health: 100,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [3],
 		pWeapon: "Toy Blaster",
 		sWeapon: "None",
@@ -33,6 +49,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Vince",
+		health: 100,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [4, 5],
 		pWeapon: "Shotgun",
 		sWeapon: "Grenade Launcher",
@@ -41,6 +61,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Rocketeer",
+		health: 120,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		name: "General Weiss",
 		weaponIndexes: [6],
 		pWeapon: "Rocket Launcher",
@@ -50,6 +74,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Spray N' Pray",
+		health: 250,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [8],
 		pWeapon: "Minigun",
 		sWeapon: "None",
@@ -58,6 +86,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Arsonist",
+		health: 100,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [9],
 		pWeapon: "Flamethrower",
 		sWeapon: "None",
@@ -66,6 +98,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Duck",
+		health: 600,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [9],
 		pWeapon: "Jump",
 		sWeapon: "None",
@@ -74,6 +110,10 @@ export const characterClasses = [
 	},
 	{
 		classN: "Nademan",
+		health: 110,
+		height: 100,
+		width: 50,
+		speed: 0.5,
 		weaponIndexes: [5],
 		pWeapon: "Nade Launcher",
 		sWeapon: "None",
@@ -96,7 +136,7 @@ export const specialClasses = [
 	},
 ];
 
-export var weapons = [
+export const weapons = [
 	{
 		name: "smg",
 		weaponIndex: 0,

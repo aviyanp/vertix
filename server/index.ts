@@ -9,7 +9,7 @@ import {
 	getCurrentWeapon,
 	roundNumber,
 } from "core/src/utils.ts";
-import { weapons } from "core/src/loadouts.ts";
+import { characterClasses, weapons } from "core/src/loadouts.ts";
 
 const server = Fastify({
 	logger: {
@@ -154,10 +154,16 @@ io.on("connection", (socket: Socket) => {
 		player.classIndex = client.classIndex
 			? client.classIndex
 			: player.classIndex;
+		const currentClass = characterClasses[player.classIndex];
+		player.currentWeapon = 0 //currentClass.weaponIndexes[0];
+		player.weapons = [weapons[0], weapons[5]] //currentClass.weaponIndexes.map(i => weapons[i]);
+		player.health = currentClass.health;
+		player.height = currentClass.height;
+		player.width = currentClass.width;
+		player.speed = currentClass.speed;
 		if (init) return;
 
 		player.dead = false;
-		player.health = 100;
 		player.angle = 0;
 		player.x = 128;
 		player.y = 128;

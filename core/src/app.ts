@@ -1,6 +1,20 @@
 //@ts-nocheck
 import * as zip from "@zip.js/zip.js";
 import { io, Socket } from "socket.io-client";
+import * as utils from "./utils.ts";
+
+const {
+  getCurrentWeapon,
+  getAngleDifference,
+  jsonByteCount,
+  byteCount,
+  getDistance,
+  getAngle,
+  shadeColor,
+  randomFloat,
+  randomInt,
+  linearInterpolate
+} = utils;
 
 var playerName;
 var playerClassIndex;
@@ -78,9 +92,6 @@ if (/Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent)) {
 	alert("tried to open google play");
 	// openGooglePlay(false);
 }
-Number.prototype.round = function (a) {
-	return +this.toFixed(a);
-};
 var previousClass = 0;
 var previousHat = 0;
 var previousShirt = 0;
@@ -4223,13 +4234,6 @@ function getNextBullet() {
 	}
 	return bullets[bulletIndex];
 }
-function getCurrentWeapon(a) {
-	if (a.weapons != undefined && a.weapons[a.currentWeapon] != undefined) {
-		return a.weapons[a.currentWeapon];
-	} else {
-		return null;
-	}
-}
 function playerSwapWeapon(a, b) {
 	if (a != null && !a.dead) {
 		a.currentWeapon += b;
@@ -6728,57 +6732,6 @@ function stillDustParticle(a, b, d) {
 	tmpParticle.checkCollisions = false;
 	tmpParticle.forceShow = d;
 	tmpParticle.active = true;
-}
-var anglDif = 0;
-var PI2 = mathPI * 2;
-function getAngleDifference(a, b) {
-	anglDif = mathABS(b - a) % PI2;
-	if (anglDif > mathPI) {
-		return PI2 - anglDif;
-	} else {
-		return anglDif;
-	}
-}
-function jsonByteCount(a) {
-	return byteCount(JSON.stringify(a));
-}
-function byteCount(a) {
-	return encodeURI(a).split(/%..|./).length - 1;
-}
-function getDistance(a, b, d, e) {
-	return mathSQRT(mathPOW(d - a, 2) + mathPOW(e - b, 2));
-}
-function getAngle(a, b, d, e) {
-	return mathATAN2(e - b, d - a);
-}
-function shadeColor(a, b) {
-	var d = parseInt(a.substring(1, 3), 16);
-	var e = parseInt(a.substring(3, 5), 16);
-	var f = parseInt(a.substring(5, 7), 16);
-	var d = parseInt((d * (100 + b)) / 100);
-	var e = parseInt((e * (100 + b)) / 100);
-	var f = parseInt((f * (100 + b)) / 100);
-	var d = d < 255 ? d : 255;
-	var e = e < 255 ? e : 255;
-	var f = f < 255 ? f : 255;
-	var d = d.toString(16).length == 1 ? "0" + d.toString(16) : d.toString(16);
-	var e = e.toString(16).length == 1 ? "0" + e.toString(16) : e.toString(16);
-	var f = f.toString(16).length == 1 ? "0" + f.toString(16) : f.toString(16);
-	return "#" + d + e + f;
-}
-function randomFloat(a, b, d) {
-	return a + Math.random() * (b - a);
-}
-function randomInt(a, b, d) {
-	return mathFloor(Math.random() * (b - a + 1)) + a;
-}
-function linearInterpolate(a, b, d) {
-	var e = a - b;
-	if (e * e > d * d) {
-		return b + d;
-	} else {
-		return a;
-	}
 }
 var then = Date.now();
 window.requestAnimFrame = (function () {

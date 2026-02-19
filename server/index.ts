@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import statc from "@fastify/static";
 import Fastify from "fastify";
 import { Server, type Socket } from "socket.io";
-//import { wallCol } from "core/src/app.ts";
+import { getCurrentWeapon } from "core/src/utils.ts";
 
 const server = Fastify({
 	logger: {
@@ -290,22 +290,26 @@ io.on("connection", (socket: Socket) => {
 
 	//TODO: socket.on stuff
 	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => {
-		//bullet info
+		getCurrentWeapon(player).spreadIndex++;
+		if (
+			getCurrentWeapon(player).spreadIndex >= getCurrentWeapon(player).spread.length
+		) {
+			getCurrentWeapon(player).spreadIndex = 0;
+		}
+		var d = getCurrentWeapon(player).spread[getCurrentWeapon(player).spreadIndex];
+		var d = (targetF + Math.PI + d).round(2);
+		var e = getCurrentWeapon(player).holdDist + getCurrentWeapon(player).bDist;
+		var f = Math.round(x + e * Math.cos(d));
+		var e = Math.round(y - getCurrentWeapon(player).yOffset - jumpY + e * Math.sin(d));
+		io.emit("2", {
+			i: player.index,
+			x: f,
+			y: e,
+			d: d,
+			si: -1,
+		})
 		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);
 	});
-	// example
-	/*
-[
-    {
-        "hdt": 0,
-        "vdt": 0,
-        "ts": 1771275940411,
-        "isn": 391,
-        "s": 0,
-        "delta": 33
-    }
-]
-	*/
 	socket.on("4", (data) => {
 		//keyboard inputs
 		let horizontalDT = data.hdt;

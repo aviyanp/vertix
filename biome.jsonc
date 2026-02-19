@@ -7,7 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": true,
-		"includes": ["**", "!public/js/**"]
+		"includes": ["**", "!public/js"]
 	},
 	"formatter": {
 		"enabled": true,
@@ -20,6 +20,12 @@
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"
+		}
+	},
+	"html": {
+		"formatter": {
+			"enabled": true,
+			"lineWidth": 120
 		}
 	}
 }

@@ -86,7 +86,7 @@ io.on("connection", (socket: Socket) => {
 		id: 0,
 		room: "DEV",
 		index: players.length,
-		name: "Guest_" + JSON.stringify(players.length),
+		name: `Guest_${JSON.stringify(players.length)}`,
 		account: { clan: "" },
 		classIndex: 0,
 		currentWeapon: 0,
@@ -138,8 +138,7 @@ io.on("connection", (socket: Socket) => {
 			io.emit(
 				"rsd",
 				players
-					.map((player) => [5, player.index, player.x, player.y, player.angle])
-					.flat(),
+					.flatMap((player) => [5, player.index, player.x, player.y, player.angle]),
 			);
 			socket.emit("cht", [-1, "synced"]);
 			return;
@@ -181,8 +180,7 @@ io.on("connection", (socket: Socket) => {
 		io.emit(
 			"rsd",
 			players
-				.map((player) => [5, player.index, player.x, player.y, player.angle])
-				.flat(),
+				.flatMap((player) => [5, player.index, player.x, player.y, player.angle]),
 		);
 	});
 	// socket.on("ftc", (playerIdx) => {
@@ -259,7 +257,7 @@ io.on("connection", (socket: Socket) => {
 		let space = data.s;
 		let delta = data.delta;
 		var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
-		if (e != 0) {
+		if (e !== 0) {
 			horizontalDT /= e;
 			verticalDT /= e;
 		}
@@ -271,12 +269,12 @@ io.on("connection", (socket: Socket) => {
 			((player.targetF + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
 		if (player.jumpCountdown > 0) {
 			player.jumpCountdown -= delta;
-		} else if (space == 1) {
+		} else if (space === 1) {
 			io.emit("jum", player.index);
 			player.jumpDelta -= player.gravityStrength * delta;
 			player.jumpY += player.jumpDelta * delta;
 		}
-		if (player.jumpY != 0) {
+		if (player.jumpY !== 0) {
 			player.jumpDelta -= player.gravityStrength * delta;
 			player.jumpY += player.jumpDelta * delta;
 			if (player.jumpY > 0) {
@@ -294,8 +292,7 @@ io.on("connection", (socket: Socket) => {
 		io.emit(
 			"rsd",
 			players
-				.map((pl) => [6, pl.index, pl.x, pl.y, pl.angle, inputNumber])
-				.flat(),
+				.flatMap((pl) => [6, pl.index, pl.x, pl.y, pl.angle, inputNumber]),
 		);
 		//console.log("4", horizontalDT, verticalDT, currentTime, inputNumber, space, delta);
 	});

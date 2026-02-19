@@ -1,8 +1,8 @@
 //@ts-nocheck
 import * as zip from "@zip.js/zip.js";
 import { io, Socket } from "socket.io-client";
-import * as utils from "./utils.ts";
 import { characterClasses, specialClasses, weaponNames } from "./loadouts.ts";
+import * as utils from "./utils.ts";
 
 const {
 	setupMap,

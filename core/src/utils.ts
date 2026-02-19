@@ -13,7 +13,12 @@ export function setupMap(a, mapTileScale) {
 	for (var m = 0; m < b.width; m++) {
 		for (var k = 0; k < b.height; k++) {
 			var tileDataBaseIdx = (b.width * k + m) << 2;
-			var p = l[tileDataBaseIdx] + " " + l[tileDataBaseIdx + 1] + " " + l[tileDataBaseIdx + 2];
+			var p =
+				l[tileDataBaseIdx] +
+				" " +
+				l[tileDataBaseIdx + 1] +
+				" " +
+				l[tileDataBaseIdx + 2];
 			var n = {
 				index: f,
 				scale: mapTileScale,
@@ -277,54 +282,58 @@ export function getCurrentWeapon(player) {
 	}
 }
 export function roundNumber(num: number, fractionDigits: number) {
-	return +num.toFixed(fractionDigits)
+	return +num.toFixed(fractionDigits);
 }
 export function getAngleDifference(angleA, angleB) {
-    let anglDif = Math.abs(angleB - angleA) % (Math.PI * 2);
-    if (anglDif > Math.PI) {
-        return (Math.PI * 2) - anglDif;
-    } else {
-        return anglDif;
-    }
+	let anglDif = Math.abs(angleB - angleA) % (Math.PI * 2);
+	if (anglDif > Math.PI) {
+		return Math.PI * 2 - anglDif;
+	} else {
+		return anglDif;
+	}
 }
 export function jsonByteCount(obj: object) {
-    return byteCount(JSON.stringify(obj));
+	return byteCount(JSON.stringify(obj));
 }
 export function byteCount(str: string) {
-    return encodeURI(str).split(/%..|./).length - 1;
+	return encodeURI(str).split(/%..|./).length - 1;
 }
 export function getDistance(x1: number, y1: number, x2: number, y2: number) {
-    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+	return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 }
 export function getAngle(x1: number, y1: number, x2: number, y2: number) {
-    return Math.atan2(y2 - y1, x2 - x1);
+	return Math.atan2(y2 - y1, x2 - x1);
 }
 export function shadeColor(hexColor: string, percent: number) {
-    var r = parseInt(hexColor.substring(1, 3), 16);
-    var g = parseInt(hexColor.substring(3, 5), 16);
-    var b = parseInt(hexColor.substring(5, 7), 16);
-    var r = (r * (100 + percent)) / 100;
-    var g = (g * (100 + percent)) / 100;
-    var b = (b * (100 + percent)) / 100;
-    var r = r < 255 ? r : 255;
-    var g = g < 255 ? g : 255;
-    var b = b < 255 ? b : 255;
-    var rstr = r.toString(16).length == 1 ? "0" + r.toString(16) : r.toString(16);
-    var gstr = g.toString(16).length == 1 ? "0" + g.toString(16) : g.toString(16);
-    var bstr = b.toString(16).length == 1 ? "0" + b.toString(16) : b.toString(16);
-    return "#" + rstr + gstr + bstr;
+	var r = parseInt(hexColor.substring(1, 3), 16);
+	var g = parseInt(hexColor.substring(3, 5), 16);
+	var b = parseInt(hexColor.substring(5, 7), 16);
+	var r = (r * (100 + percent)) / 100;
+	var g = (g * (100 + percent)) / 100;
+	var b = (b * (100 + percent)) / 100;
+	var r = r < 255 ? r : 255;
+	var g = g < 255 ? g : 255;
+	var b = b < 255 ? b : 255;
+	var rstr = r.toString(16).length == 1 ? "0" + r.toString(16) : r.toString(16);
+	var gstr = g.toString(16).length == 1 ? "0" + g.toString(16) : g.toString(16);
+	var bstr = b.toString(16).length == 1 ? "0" + b.toString(16) : b.toString(16);
+	return "#" + rstr + gstr + bstr;
 }
 export function randomFloat(min: number, max: number) {
-    return min + Math.random() * (max - min);
+	return min + Math.random() * (max - min);
 }
 export function randomInt(min: number, max: number) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-export function linearInterpolate(current: number, target: number, step: number) {
-    var delta = current - target;
-    if (delta * delta > step * step) {
-        return target + step;
-    } else {
-        return current;
-    }
+export function linearInterpolate(
+	current: number,
+	target: number,
+	step: number,
+) {
+	var delta = current - target;
+	if (delta * delta > step * step) {
+		return target + step;
+	} else {
+		return current;
+	}
 }

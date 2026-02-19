@@ -112,7 +112,7 @@ export var weapons = [
 		length: 90,
 		yOffset: 55,
 		holdDist: 5,
-		
+
 		bSpeed: 6,
 		bWidth: 8,
 		bHeight: 18,
@@ -132,10 +132,10 @@ export var weapons = [
 		shake: 0.4,
 		lastShot: 0,
 	},
-	{name: "revolver"},
-	{name: "sniper"},
-	{name: "toygun"},
-	{name: "shotgun"},
+	{ name: "revolver" },
+	{ name: "sniper" },
+	{ name: "toygun" },
+	{ name: "shotgun" },
 	{
 		name: "grenades",
 		weaponIndex: 5,
@@ -171,10 +171,10 @@ export var weapons = [
 		shake: 0.4,
 		lastShot: 0,
 	},
-	{name: "rockets"},
-	{name: "pistol"},
-	{name: "minigun"},
-	{name: "flamethrower"}
-]
+	{ name: "rockets" },
+	{ name: "pistol" },
+	{ name: "minigun" },
+	{ name: "flamethrower" },
+];
 
 export const weaponNames = weapons.map((w) => [w.name]).flat();

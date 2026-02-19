@@ -107,6 +107,7 @@ io.on("connection", (socket: Socket) => {
 		dead: true,
 		type: "player",
 		targetF: 0,
+		animIndex: 0,
 		//team: "blue/red",
 	};
 	players.push(player);
@@ -217,8 +218,6 @@ io.on("connection", (socket: Socket) => {
 
 	//TODO: socket.emit stuff
 	//socket.emit("upd", {})  //updateUserValue
-	//socket.emit("2", {})   //someoneShot
-	//socket.emit("jum", {}) //otherJump
 	//socket.emit("tprt", { indx: 0, newX: 0, newY: 0 })
 
 	//TODO: socket.on stuff
@@ -266,6 +265,25 @@ io.on("connection", (socket: Socket) => {
 		player.y += verticalDT * player.speed * delta;
 		player.angle =
 			((player.targetF + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
+		if (player.jumpCountdown > 0) {
+			player.jumpCountdown -= delta;
+		} else if (space == 1) {
+			io.emit("jum", player.index);
+			player.jumpDelta -= player.gravityStrength * delta;
+			player.jumpY += player.jumpDelta * delta;
+		}
+		if (player.jumpY != 0) {
+			player.jumpDelta -= player.gravityStrength * delta;
+			player.jumpY += player.jumpDelta * delta;
+			if (player.jumpY > 0) {
+				player.animIndex = 1;
+			} else {
+				player.jumpY = 0;
+				player.jumpDelta = 0;
+				player.jumpCountdown = 250;
+			}
+			player.jumpY = Math.round(player.jumpY);
+		}
 		wallCol(player, { tiles }, { clutter });
 		player.x = Math.round(player.x);
 		player.y = Math.round(player.y);

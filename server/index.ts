@@ -181,7 +181,9 @@ io.on("connection", (socket: Socket) => {
 					.flat(),
 			);
 			socket.emit("cht", [-1, "synced"]);
+			return;
 		}
+		io.emit("cht", ([ player.index, msg ]))
 	});
 	socket.on("ping1", () => {
 		socket.emit("pong1");
@@ -276,6 +278,9 @@ io.on("connection", (socket: Socket) => {
 	socket.on("r", () => {
 		socket.emit("r", player.currentWeapon);
 	});
+	socket.on("0", (targetF) => {
+		player.targetF = targetF;
+	});
 
 	//TODO: socket.emit stuff
 	//socket.emit("upd", {})  //updateUserValue
@@ -284,11 +289,6 @@ io.on("connection", (socket: Socket) => {
 	//socket.emit("tprt", { indx: 0, newX: 0, newY: 0 })
 
 	//TODO: socket.on stuff
-	socket.on("0", (targetF) => {
-		//mouse pos/angle?
-		player.targetF = targetF;
-		//console.log(targetF)
-	});
 	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => {
 		//bullet info
 		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);

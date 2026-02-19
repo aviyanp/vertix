@@ -1001,6 +1001,7 @@ function messageFromServer(a) {
 	try {
 		tmpChatUser = findUserByIndex(a[0]);
 		if (tmpChatUser != null) {
+			if (tmpChatUser.index === player.index) return;
 			chat.addChatLine(
 				tmpChatUser.name,
 				a[1],

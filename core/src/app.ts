@@ -2,8 +2,10 @@
 import * as zip from "@zip.js/zip.js";
 import { io, Socket } from "socket.io-client";
 import * as utils from "./utils.ts";
+import { characterClasses, specialClasses, weaponNames } from "./loadouts.ts";
 
 const {
+	setupMap,
 	wallCol,
 	getCurrentWeapon,
 	getAngleDifference,
@@ -1543,7 +1545,7 @@ function setupSocket(a: Socket) {
 				b.type = "clutter";
 				gameObjects.push(b);
 			}
-			setupMap(gameMap);
+			setupMap(gameMap, mapTileScale);
 			cachedMiniMap = null;
 			deactivateSprays();
 			for (d = 0; d < 100; ++d) {
@@ -2282,202 +2284,6 @@ function canPlaceFlag(a, b) {
 		return a != undefined && !a.hardPoint;
 	}
 }
-function setupMap(a) {
-	var b = a.genData;
-	var d = -(mapTileScale * 2);
-	var e = -(mapTileScale * 2);
-	var f = 0;
-	var h = b.height;
-	var g;
-	a.tilePerCol = h;
-	a.width = (b.width - 4) * mapTileScale;
-	a.height = (b.height - 4) * mapTileScale;
-	a.scoreToWin = a.gameMode.score;
-	var l = b.data.data || b.data;
-	for (var m = 0; m < b.width; m++) {
-		for (var k = 0; k < b.height; k++) {
-			var p = (b.width * k + m) << 2;
-			var p = l[p] + " " + l[p + 1] + " " + l[p + 2];
-			var n = {
-				index: f,
-				scale: mapTileScale,
-				x: 0,
-				y: 0,
-				wall: false,
-				spriteIndex: 0,
-				left: 0,
-				right: 0,
-				top: 0,
-				bottom: 0,
-				topLeft: 0,
-				topRight: 0,
-				bottomLeft: 0,
-				bottomRight: 0,
-				neighbours: 0,
-				hasCollision: false,
-				hardPoint: false,
-				objTeam: "e",
-				edgeTile: false,
-			};
-			n.x = d + mapTileScale * m;
-			n.y = e + mapTileScale * k;
-			if (m == 0 && k == 0) {
-				p = "0 0 0";
-			}
-			if (p == "0 0 0") {
-				n.wall = true;
-				n.hasCollision = true;
-				g = a.tiles[f - h];
-				if (g != undefined) {
-					if (g.wall) {
-						n.left = 1;
-						n.neighbours += 1;
-					}
-					g.right = 1;
-					g.neighbours += 1;
-				}
-				g = a.tiles[f - h - 1];
-				if (g != undefined && g.wall) {
-					g.spriteIndex = 0;
-				}
-				g = a.tiles[f - h - 1];
-				if (g != undefined && g.wall) {
-					n.topLeft = 1;
-					g.bottomRight = 1;
-				}
-				g = a.tiles[f - h + 1];
-				if (g != undefined) {
-					g.topRight = 1;
-					if (g.wall) {
-						n.bottomLeft = 1;
-					}
-				}
-				g = a.tiles[f - 1];
-				if (g != undefined) {
-					if (g.wall) {
-						n.top = 1;
-						n.neighbours += 1;
-					}
-					g.bottom = 1;
-					g.neighbours += 1;
-				}
-				if (m <= 0 || k <= 0 || m >= b.width - 1 || k >= b.height - 1) {
-					n.left = 1;
-					n.right = 1;
-					n.top = 1;
-					n.bottom = 1;
-					n.neighbours = 4;
-					n.edgeTile = true;
-				}
-				if (n.spriteIndex == 0 && randomInt(0, 2) == 0) {
-					n.spriteIndex = randomInt(1, 2);
-				}
-			} else {
-				g = randomInt(0, 10);
-				n.spriteIndex = 0;
-				if (g <= 0) {
-					n.spriteIndex = 1;
-				}
-				n.wall = false;
-				g = a.tiles[f - h];
-				if (g != undefined && g.wall) {
-					n.left = 1;
-					n.neighbours += 1;
-				}
-				g = a.tiles[f - 1];
-				if (g != undefined && g.wall) {
-					n.top = 1;
-					n.neighbours += 1;
-				}
-				g = a.tiles[f - h - 1];
-				if (g != undefined && g.wall) {
-					n.topLeft = 1;
-				}
-				if (p == "0 255 0") {
-					n.spriteIndex = 2;
-				} else if (p == "255 255 0") {
-					if (a.gameMode.name == "Hardpoint" || a.gameMode.name == "Zone War") {
-						n.hardPoint = true;
-						if (a.gameMode.name == "Zone War") {
-							n.objTeam = m < b.width / 2 ? "red" : "blue";
-						}
-					} else {
-						n.spriteIndex = 1;
-					}
-				}
-			}
-			a.tiles.push(n);
-			f++;
-		}
-	}
-	// tmpY = tmpShad = null;
-	for (b = 0; b < a.tiles.length; ++b) {
-		if (a.tiles[b].edgeTile) {
-			a.tiles[b].hasCollision = false;
-		} else if (!a.tiles[b].wall && a.tiles[b].hardPoint) {
-			if (
-				canPlaceFlag(a.tiles[b - h], true) &&
-				canPlaceFlag(a.tiles[b - 1], false)
-			) {
-				gameObjects.push({
-					type: "flag",
-					team: a.tiles[b].objTeam,
-					x: a.tiles[b].x + 40,
-					y: a.tiles[b].y + 40,
-					w: 70,
-					h: 152,
-					ai: randomInt(0, 2),
-					ac: 0,
-				});
-			}
-			if (
-				canPlaceFlag(a.tiles[b + h], true) &&
-				canPlaceFlag(a.tiles[b - 1], false)
-			) {
-				gameObjects.push({
-					type: "flag",
-					team: a.tiles[b].objTeam,
-					x: a.tiles[b].x + mapTileScale - 30 - 40,
-					y: a.tiles[b].y + 40,
-					w: 70,
-					h: 152,
-					ai: randomInt(0, 2),
-					ac: 0,
-				});
-			}
-			if (
-				canPlaceFlag(a.tiles[b + h], true) &&
-				canPlaceFlag(a.tiles[b + 1], false)
-			) {
-				gameObjects.push({
-					type: "flag",
-					team: a.tiles[b].objTeam,
-					x: a.tiles[b].x + mapTileScale - 30 - 40,
-					y: a.tiles[b].y + mapTileScale - 30 - 40,
-					w: 70,
-					h: 152,
-					ai: randomInt(0, 2),
-					ac: 0,
-				});
-			}
-			if (
-				canPlaceFlag(a.tiles[b - h], true) &&
-				canPlaceFlag(a.tiles[b + 1], false)
-			) {
-				gameObjects.push({
-					type: "flag",
-					team: a.tiles[b].objTeam,
-					x: a.tiles[b].x + 40,
-					y: a.tiles[b].y + mapTileScale - 30 - 40,
-					w: 70,
-					h: 152,
-					ai: randomInt(0, 2),
-					ac: 0,
-				});
-			}
-		}
-	}
-}
 var tmpNowTime = 0;
 function receiveServerData(a) {
 	tmpNowTime = Date.now();
@@ -2561,7 +2367,6 @@ function receiveServerData(a) {
 						//  a /= e;
 						//  b /= e;
 						//}
-						//TODO: double check if this is a real fix
 						gameObjects[d].oldX = gameObjects[d].x;
 						gameObjects[d].oldY = gameObjects[d].y;
 						gameObjects[d].x += a * gameObjects[d].speed * thisInput[f].delta;
@@ -4426,10 +4231,7 @@ function updateBullets(a) {
 	}
 	h = null;
 }
-var weaponNames =
-	"smg revolver sniper toygun shotgun grenades rockets pistol minigun flamethrower".split(
-		" ",
-	);
+
 var characterClasses = [
 	{
 		classN: "Triggerman",

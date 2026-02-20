@@ -226,6 +226,7 @@ io.on("connection", (socket: Socket) => {
 	});
 	socket.on("sw", (currentWeapon) => {
 		player.currentWeapon = currentWeapon;
+		io.emit("upd", { i: player.index, wi: player.currentWeapon })
 	});
 	socket.on("r", () => {
 		setTimeout(() => {
@@ -242,20 +243,21 @@ io.on("connection", (socket: Socket) => {
 
 	//TODO: socket.on stuff
 	socket.on("1", (x, y, jumpY, targetF, targetD, currentTime) => {
-		getCurrentWeapon(player).spreadIndex++;
+		const currentWeapon = getCurrentWeapon(player)
+		currentWeapon.spreadIndex++;
 		if (
-			getCurrentWeapon(player).spreadIndex >=
-			getCurrentWeapon(player).spread.length
+			currentWeapon.spreadIndex >=
+			currentWeapon.spread.length
 		) {
-			getCurrentWeapon(player).spreadIndex = 0;
+			currentWeapon.spreadIndex = 0;
 		}
 		var d =
-			getCurrentWeapon(player).spread[getCurrentWeapon(player).spreadIndex];
+			currentWeapon.spread[currentWeapon.spreadIndex];
 		d = roundNumber(targetF + Math.PI + d, 2);
-		var e = getCurrentWeapon(player).holdDist + getCurrentWeapon(player).bDist;
+		var e = currentWeapon.holdDist + currentWeapon.bDist;
 		var f = Math.round(x + e * Math.cos(d));
 		e = Math.round(
-			y - getCurrentWeapon(player).yOffset - jumpY + e * Math.sin(d),
+			y - currentWeapon.yOffset - jumpY + e * Math.sin(d),
 		);
 		io.emit("2", {
 			i: player.index,
@@ -264,7 +266,15 @@ io.on("connection", (socket: Socket) => {
 			d: d,
 			si: -1,
 		});
-		//console.log("1", x, y, jumpY, targetF, targetD, currentTime);
+		//TODO: damage sync
+		//io.emit("1", {
+		//	dID: player.index,
+		//	gID: otherPlayer.index,
+		//	amount: currentWeapon.dmg,
+		//	bi: bullets[b].serverIndex,
+		//	h: otherPlayer.health - currentWeapon.dmg,
+		//});
+		//io.emit("3", {})
 	});
 	socket.on("4", (data) => {
 		let horizontalDT = data.hdt;

@@ -1,6 +1,7 @@
 //@ts-nocheck
 import * as zip from "@zip.js/zip.js";
-import { io, Socket } from "socket.io-client";
+import $ from "jquery";
+import { io, type Socket } from "socket.io-client";
 import { characterClasses, specialClasses, weaponNames } from "./loadouts.ts";
 import * as utils from "./utils.ts";
 
@@ -51,7 +52,6 @@ var tabbed = 0;
 var timeSinceLastUpdate = 0;
 var timeOfLastUpdate = 0;
 var port;
-var region;
 
 window.settingShowNames = settingShowNames;
 
@@ -202,9 +202,9 @@ function selectedCMap(a) {
 	document.getElementById("customMapButton").innerHTML = b[b.length - 1];
 	if (a.files && a.files[0]) {
 		b = new FileReader();
-		b.onload = function (a) {
+		b.onload = (a) => {
 			var b = document.createElement("img");
-			b.onload = function (a) {
+			b.onload = (a) => {
 				a = document.createElement("canvas");
 				a.width = b.width;
 				a.height = b.height;
@@ -222,72 +222,73 @@ function selectedCMap(a) {
 }
 function clearCustomMap() {
 	customMap = null;
-	document.getElementById("customMapButton").innerHTML = "Select Map";
+	document.getElementById("customMapButton").textContent = "Select Map";
 }
-window.onload = function () {
+
+window.onload = () => {
 	if (mobile) {
-		document.getElementById("loadText").innerHTML =
+		document.getElementById("loadText").textContent =
 			"MOBILE VERSION COMING SOON";
 	} else {
 		document.documentElement.style.overflow = "hidden";
 		document.body.scroll = "no";
 		document.getElementById("gameAreaWrapper").style.opacity = 1;
 		drawMenuBackground();
-		settingsMenu.onclick = function () {
-			if (settings.style.maxHeight == "200px") {
+		settingsMenu.onclick = () => {
+			if (settings.style.maxHeight === "200px") {
 				settings.style.maxHeight = "0px";
 			} else {
 				settings.style.maxHeight = "200px";
 				howTo.style.maxHeight = "0px";
 			}
 		};
-		howToMenu.onclick = function () {
-			if (howTo.style.maxHeight == "200px") {
+		howToMenu.onclick = () => {
+			if (howTo.style.maxHeight === "200px") {
 				howTo.style.maxHeight = "0px";
 			} else {
 				howTo.style.maxHeight = "200px";
 				settings.style.maxHeight = "0px";
 			}
 		};
-		leaderboardButton.onclick = function () {
+		leaderboardButton.onclick = () => {
 			window.open("/leaderboards.html", "_blank");
 		};
-		$.get("/getIP", function (a) {
+		$.get("/getIP", (a) => {
 			port = a.port;
 			if (!socket) {
-				socket = io("http://" + (devTest ? "localhost" : a.ip) + ":" + a.port, {
+				socket = io(`http://${devTest ? "localhost" : a.ip}:${a.port}`, {
 					reconnection: true,
 					transports: ["websocket"],
 					forceNew: false,
 				});
 				setupSocket(socket);
 			}
-			socket.once("connect", function () {
+			socket.once("connect", () => {
 				var a = getCookie("logKey");
 				var d = getCookie("userName");
-				if (a && a != "" && d && d != "") {
+				if (a && a !== "" && d && d !== "") {
 					socket.emit("dbLogin", {
 						lgKey: a,
 						userName: d,
 						userPass: false,
 					});
 					loginMessage.style.display = "block";
-					loginMessage.innerHTML = "Logging in...";
+					loginMessage.textContent = "Logging in...";
 				} else {
 					loadSavedClass();
 				}
-				btn.onclick = function () {
+				btn.onclick = () => {
 					startGame("player");
 				};
-				playerNameInput.addEventListener("keypress", function (a) {
+				playerNameInput.addEventListener("keypress", (a) => {
 					if ((a.which || a.keyCode) === 13) {
 						startGame("player");
 					}
 				});
-				btnMod.onclick = function () {
+				btnMod.onclick = () => {
 					loadModPack(modURL.value, false);
 				};
-				registerButton.onclick = function () {
+				registerButton.onclick = () => {
 					socket.emit("dbReg", {
 						userName: userNameInput.value,
 						userEmail: userEmailInput.value,
@@ -296,15 +297,15 @@ window.onload = function () {
 					loginUserNm = userNameInput.value;
 					loginUserPs = userPassInput.value;
 					loginMessage.style.display = "block";
-					loginMessage.innerHTML = "Registering...";
+					loginMessage.textContent = "Registering...";
 				};
-				loginButton.onclick = function () {
+				loginButton.onclick = () => {
 					startLogin();
 				};
-				logoutButton.onclick = function () {
+				logoutButton.onclick = () => {
 					loggedInWrapper.style.display = "none";
 					loginWrapper.style.display = "block";
-					loginMessage.innerHTML = "";
+					loginMessage.textContent = "";
 					loggedIn = false;
 					resetHatList();
 					resetShirtList();
@@ -313,61 +314,61 @@ window.onload = function () {
 					setCookie("userName", "");
 					socket.emit("dbLogout");
 				};
-				recoverButton.onclick = function () {
+				recoverButton.onclick = () => {
 					socket.emit("dbRecov", {
 						userMail: userEmailInput.value,
 					});
 					loginMessage.style.display = "block";
-					loginMessage.innerHTML = "Please Wait...";
+					loginMessage.textContent = "Please Wait...";
 				};
-				createClanButton.onclick = function () {
+				createClanButton.onclick = () => {
 					socket.emit("dbClanCreate", {
 						clanName: clanNameInput.value,
 					});
 					clanDBMessage.style.display = "block";
-					clanDBMessage.innerHTML = "Please Wait...";
+					clanDBMessage.textContent = "Please Wait...";
 				};
-				joinClanButton.onclick = function () {
+				joinClanButton.onclick = () => {
 					socket.emit("dbClanJoin", {
 						clanKey: clanKeyInput.value,
 					});
 					clanDBMessage.style.display = "block";
-					clanDBMessage.innerHTML = "Please Wait...";
+					clanDBMessage.textContent = "Please Wait...";
 				};
-				inviteClanButton.onclick = function () {
+				inviteClanButton.onclick = () => {
 					socket.emit("dbClanInvite", {
 						userName: clanInviteInput.value,
 					});
 					clanInvMessage.style.display = "block";
-					clanInvMessage.innerHTML = "Please Wait...";
+					clanInvMessage.textContent = "Please Wait...";
 				};
-				kickClanButton.onclick = function () {
+				kickClanButton.onclick = () => {
 					socket.emit("dbClanKick", {
 						userName: clanInviteInput.value,
 					});
 					clanInvMessage.style.display = "block";
-					clanInvMessage.innerHTML = "Please Wait...";
+					clanInvMessage.textContent = "Please Wait...";
 				};
-				leaveClanButton.onclick = function () {
+				leaveClanButton.onclick = () => {
 					socket.emit("dbClanLeave");
 				};
-				setChatClanButton.onclick = function () {
+				setChatClanButton.onclick = () => {
 					socket.emit("dbClanChatURL", {
 						chUrl: clanChatInput.value,
 					});
 					clanChtMessage.style.display = "inline-block";
-					clanChtMessage.innerHTML = "Please Wait...";
+					clanChtMessage.textContent = "Please Wait...";
 				};
-				createServerButton.onclick = function () {
+				createServerButton.onclick = () => {
 					var a = document.getElementById("serverPlayers").value;
 					var b = document.getElementById("serverHealthMult").value;
 					var d = document.getElementById("serverSpeedMult").value;
 					var g = document.getElementById("serverPass").value;
 					var l = document.getElementById("clanWarEnabled").checked;
 					var m = [];
-					for (var k = 0; k < 9; ++k) {
-						if (document.getElementById("serverMode" + k).checked) {
-							m.push(k);
+					for (let i = 0; i < 9; ++i) {
+						if (document.getElementById(`serverMode${i}`).checked) {
+							m.push(i);
 						}
 					}
 					socket.emit("cSrv", {
@@ -380,31 +381,28 @@ window.onload = function () {
 						srvModes: m,
 					});
 				};
-				lobbyButton.onclick = function () {
+				lobbyButton.onclick = () => {
 					if (!changingLobby) {
 						if (lobbyInput.value.split("/")[0].trim()) {
 							lobbyMessage.style.display = "block";
 							lobbyMessage.innerHTML = "Please wait...";
 							changingLobby = true;
-							var b = io.connect(
-								"http://" + lobbyInput.value.split("/")[0] + ":" + port,
-								{
-									reconnection: true,
-									forceNew: true,
-								},
-							);
-							b.once("connect", function () {
+							const b = io(`http://${lobbyInput.value.split("/")[0]}:${port}`, {
+								reconnection: true,
+								forceNew: true,
+							});
+							b.once("connect", () => {
 								b.emit("create", {
 									room: lobbyInput.value.split("/")[1],
 									servPass: lobbyPass.value,
 									lgKey: a,
 									userName: d,
 								});
-								b.once("lobbyRes", function (a, d) {
+								b.once("lobbyRes", (a, d) => {
 									lobbyMessage.innerHTML = a.resp || a;
 									if (d) {
 										socket.removeListener("disconnect");
-										socket.once("disconnect", function () {
+										socket.once("disconnect", () => {
 											socket.close();
 											changingLobby = false;
 											socket = b;
@@ -418,7 +416,7 @@ window.onload = function () {
 									}
 								});
 							});
-							b.on("connect_error", function (a) {
+							b.on("connect_error", (a) => {
 								lobbyMessage.innerHTML = "No Server Found.";
 								changingLobby = false;
 								b.close();
@@ -432,11 +430,9 @@ window.onload = function () {
 			});
 		});
 		hideUI(true);
-		$(".noRightClick").bind("contextmenu", function (a) {
-			return false;
-		});
+		$(".noRightClick").bind("contextmenu", (a) => false);
 		resize();
-		$("#loadingWrapper").fadeOut(200, function () {});
+		$("#loadingWrapper").fadeOut(200, () => {});
 	}
 };
 function openGooglePlay(a) {
@@ -466,24 +462,24 @@ var saveAccountData = document.getElementById("saveAccountData");
 var editProfileMessage = document.getElementById("editProfileMessage");
 function updateAccountPage(a) {
 	player.account = a;
-	accStatRank.innerHTML = "<b>Rank:  </b>" + a.rank;
-	accStatRankProg.style.width = a.rankPercent + "%";
-	accStatKills.innerHTML = "<b>Kills:  </b>" + a.kills;
-	accStatDeaths.innerHTML = "<b>Deaths:  </b>" + a.deaths;
-	accStatKD.innerHTML = "<b>KD:  </b>" + a.kd;
-	accStatWorldRank.innerHTML = "<b>World Rank:  </b>" + a.worldRank;
-	accStatLikes.innerHTML = "<b>Likes:  </b>" + a.likes;
-	profileButton.onclick = function () {
+	accStatRank.innerHTML = `<b>Rank:  </b>${a.rank}`;
+	accStatRankProg.style.width = `${a.rankPercent}%`;
+	accStatKills.innerHTML = `<b>Kills:  </b>${a.kills}`;
+	accStatDeaths.innerHTML = `<b>Deaths:  </b>${a.deaths}`;
+	accStatKD.innerHTML = `<b>KD:  </b>${a.kd}`;
+	accStatWorldRank.innerHTML = `<b>World Rank:  </b>${a.worldRank}`;
+	accStatLikes.innerHTML = `<b>Likes:  </b>${a.likes}`;
+	profileButton.onclick = () => {
 		showUserStatPage(player.account.user_name);
 	};
 	newUsernameInput.value = player.account.user_name;
 	youtubeChannelInput.value = player.account.channel;
-	saveAccountData.onclick = function () {
+	saveAccountData.onclick = () => {
 		socket.emit("dbEditUser", {
 			userName: newUsernameInput.value,
 			userChannel: youtubeChannelInput.value,
 		});
-		editProfileMessage.innerHTML = "Please Wait...";
+		editProfileMessage.textContent = "Please Wait...";
 	};
 	clanAdminPanel.style.display = "none";
 	leaveClanButton.style.display = "none";
@@ -491,16 +487,16 @@ function updateAccountPage(a) {
 		clanSignUp.style.display = "none";
 		clanStats.style.display = "block";
 		leaveClanButton.style.display = "inline-block";
-		leaveClanButton.innerHTML = "LEAVE CLAN";
-		clanHeader.innerHTML = "[" + a.clan + "] CLAN:";
-		if (a.clan_owner == "1") {
+		leaveClanButton.textContent = "LEAVE CLAN";
+		clanHeader.textContent = `[${a.clan}] CLAN:`;
+		if (a.clan_owner === "1") {
 			clanAdminPanel.style.display = "block";
-			leaveClanButton.innerHTML = "DELETE CLAN";
+			leaveClanButton.textContent = "DELETE CLAN";
 		}
 	} else {
 		clanSignUp.style.display = "block";
 		clanStats.style.display = "none";
-		clanHeader.innerHTML = "Clans";
+		clanHeader.textContent = "Clans";
 	}
 }
 var clanStatRank = document.getElementById("clanStatRank");
@@ -508,21 +504,20 @@ var clanStatFounder = document.getElementById("clanStatFounder");
 var clanStatMembers = document.getElementById("clanStatMembers");
 var clanStatKD = document.getElementById("clanStatKD");
 function updateClanPage(a) {
-	clanStatRank.innerHTML = "<b>Rank:  </b>" + a.level;
-	clanStatKD.innerHTML = "<b>Avg KD:  </b>" + a.kd;
-	clanStatFounder.innerHTML = "<b>Founder:  </b>" + a.founder;
-	clanStatMembers.innerHTML = "<b>Roster:</b>" + a.members;
+	clanStatRank.innerHTML = `<b>Rank:  </b>${a.level}`;
+	clanStatKD.innerHTML = `<b>Avg KD:  </b>${a.kd}`;
+	clanStatFounder.innerHTML = `<b>Founder:  </b>${a.founder}`;
+	clanStatMembers.innerHTML = `<b>Roster:</b>${a.members}`;
 	a = a.chatURL;
-	if (a != "") {
+	if (a !== "") {
 		if (!a.match(/^https?:\/\//i)) {
-			a = "http://" + a;
+			a = `http://${a}`;
 		}
-		clanChatLink.innerHTML =
-			"<a target='_blank' href='" + a + "'>Clan Chat</a>";
+		clanChatLink.innerHTML = `<a target='_blank' href='${a}'>Clan Chat</a>`;
 	}
 }
 function showUserStatPage(a) {
-	window.open("/profile.html?" + a, "_blank");
+	window.open(`/profile.html?${a}`, "_blank");
 }
 var screenWidth = window.innerWidth;
 var screenHeight = window.innerHeight;
@@ -603,7 +598,7 @@ var reenviar = true;
 var directionLock = false;
 var directions = [];
 var zipFileCloser;
-var mainCanvas = document.getElementById("cvs");
+var mainCanvas: HTMLCanvasElement = document.getElementById("cvs");
 mainCanvas.width = screenWidth;
 mainCanvas.height = screenHeight;
 mainCanvas.addEventListener("mousemove", gameInput, false);
@@ -900,7 +895,7 @@ function ChatManager() {
 	this.commands = {};
 	var a = document.getElementById("chatInput");
 	a.addEventListener("keypress", this.sendChat.bind(this));
-	a.addEventListener("keyup", function (b) {
+	a.addEventListener("keyup", (b) => {
 		a = document.getElementById("chatInput");
 		b = b.which || b.keyCode;
 		if (b === 27) {
@@ -977,7 +972,7 @@ ChatManager.prototype.addChatLine = function (a, b, d, e) {
 		f.className = h;
 		e = false;
 		if (h == "system" || h == "notif") {
-			f.innerHTML = "<span>" + b + "</span>";
+			f.innerHTML = `<span>${b}</span>`;
 		} else {
 			e = true;
 			f.innerHTML =
@@ -989,25 +984,19 @@ ChatManager.prototype.addChatLine = function (a, b, d, e) {
 		}
 		this.appendMessage(f);
 		if (e) {
-			if ("innerText" in document.createElement("span")) {
-				document.getElementById("chatLine" + chatLineCounter).innerText = b;
-			} else {
-				document.getElementById("chatLine" + chatLineCounter).textContext = b;
-			}
+			document.getElementById(`chatLine${chatLineCounter}`).textContent = b;
 		}
 	}
 };
-ChatManager.prototype.appendMessage = function (a) {
-	if (!mobile) {
-		for (
-			var b = document.getElementById("chatbox"),
-				d = document.getElementById("chatList");
-			b.clientHeight > 260;
-		) {
-			d.removeChild(d.childNodes[0]);
-		}
-		d.appendChild(a);
+ChatManager.prototype.appendMessage = (a) => {
+	if (mobile) return;
+
+	const chatbox = document.getElementById("chatbox");
+	const chatList = document.getElementById("chatList");
+	for (; chatbox.clientHeight > 260; ) {
+		chatList.removeChild(chatList.childNodes[0]);
 	}
+	chatList.appendChild(a);
 };
 var chat = new ChatManager();
 var tmpChatUser = null;
@@ -1019,10 +1008,10 @@ function messageFromServer(a) {
 			chat.addChatLine(
 				tmpChatUser.name,
 				a[1],
-				tmpChatUser.index == player.index,
+				tmpChatUser.index === player.index,
 				tmpChatUser.team,
 			);
-		} else if (a[0] == -1) {
+		} else if (a[0] === -1) {
 			chat.addChatLine("", a[1], false, "system");
 		} else {
 			chat.addChatLine("", a[1], false, "notif");
@@ -1189,7 +1178,7 @@ function settingShowPingFps(a) {
 	}
 	setCookie("showPINGFPS", showPINGFPS ? "true" : "false");
 }
-if (getCookie("showLeader") != "false") {
+if (getCookie("showLeader") !== "false") {
 	if (!document.getElementById("showLeader").checked) {
 		document.getElementById("showLeader").click();
 	}
@@ -1244,21 +1233,17 @@ function pickedFps(a) {
 	setCookie("targetFPS", targetFPS);
 }
 function changeMenuTab(a, b) {
-	var d;
-	var e;
-	var f;
-	e = document.getElementsByClassName("tabcontent");
-	for (d = 0; d < e.length; d++) {
-		e[d].style.display = "none";
+	const e = document.getElementsByClassName("tabcontent");
+	for (let i = 0; i < e.length; i++) {
+		e[i].style.display = "none";
 	}
-	f = document.getElementsByClassName("tablinks");
-	for (d = 0; d < e.length; d++) {
-		f[d].className = f[d].className.replace(" active", "");
+	const f = document.getElementsByClassName("tablinks");
+	for (let i = 0; i < e.length; i++) {
+		f[i].className = f[i].className.replace(" active", "");
 	}
 	document.getElementById(b).style.display = "block";
 	a.currentTarget.className += " active";
 }
-console.log(changeMenuTab);
 function kickPlayer(a) {
 	if (!disconnected) {
 		hideStatTable();
@@ -1323,7 +1308,7 @@ var fpsText = document.getElementById("fpsText");
 var pingStart = 0;
 function receivePing() {
 	var a = Date.now() - pingStart;
-	pingText.innerHTML = "PING " + a;
+	pingText.innerHTML = `PING ${a}`;
 }
 var pingInterval = null;
 function setupSocket(a: Socket) {
@@ -1339,26 +1324,26 @@ function setupSocket(a: Socket) {
 	if (pingInterval != null) {
 		clearInterval(pingInterval);
 	}
-	pingInterval = setInterval(function () {
+	pingInterval = setInterval(() => {
 		pingStart = Date.now();
 		a.emit("ping1");
 	}, 2000);
-	a.on("yourRoom", function (a, d) {
+	a.on("yourRoom", (a, d) => {
 		room = a;
 		serverKeyTxt.innerHTML = d;
 	});
-	a.on("connect_failed", function () {
+	a.on("connect_failed", () => {
 		kickPlayer("Connection failed. Please check your internet connection.");
 	});
-	a.on("disconnect", function (a) {
+	a.on("disconnect", (a) => {
 		kickPlayer("Disconnected. Your connection timed out.");
 		console.log(a);
 	});
-	a.on("error", function (a) {
+	a.on("error", (a) => {
 		console.log("PLEASE NOTIFY THE DEVELOPER OF THE FOLLOWING ERROR");
-		console.log("ERROR: " + a);
+		console.log(`ERROR: ${a}`);
 	});
-	a.on("welcome", function (b, d) {
+	a.on("welcome", (b, d) => {
 		player.id = b.id;
 		player.room = b.room;
 		room = player.room;
@@ -1386,21 +1371,21 @@ function setupSocket(a: Socket) {
 		}
 		resize();
 	});
-	a.on("cSrvRes", function (a, d) {
+	a.on("cSrvRes", (a, d) => {
 		if (d) {
 			serverKeyTxt.innerHTML = a;
-			serverCreateMessage.innerHTML = "Success. Created server with IP: " + a;
+			serverCreateMessage.innerHTML = `Success. Created server with IP: ${a}`;
 		} else {
 			serverCreateMessage.innerHTML = a;
 		}
 	});
-	a.on("regRes", function (a, d) {
+	a.on("regRes", (a, d) => {
 		if (!d) {
 			loginMessage.style.display = "block";
 		}
 		loginMessage.innerHTML = a;
 	});
-	a.on("logRes", function (a, d) {
+	a.on("logRes", (a, d) => {
 		if (d) {
 			loginMessage.style.display = "none";
 			loginMessage.innerHTML = "";
@@ -1423,21 +1408,21 @@ function setupSocket(a: Socket) {
 		}
 		loadSavedClass();
 	});
-	a.on("recovRes", function (b, d) {
+	a.on("recovRes", (b, d) => {
 		loginMessage.style.display = "block";
 		loginMessage.innerHTML = b;
 		if (d) {
 			document.getElementById("recoverForm").style.display = "block";
 			var e = document.getElementById("chngPassKey");
 			var f = document.getElementById("chngPassPass");
-			document.getElementById("chngPassButton").onclick = function () {
+			document.getElementById("chngPassButton").onclick = () => {
 				loginMessage.style.display = "block";
 				loginMessage.innerHTML = "Please Wait...";
 				a.emit("dbCngPass", {
 					passKey: e.value,
 					newPass: f.value,
 				});
-				a.on("cngPassRes", function (a, b) {
+				a.on("cngPassRes", (a, b) => {
 					loginMessage.style.display = "block";
 					loginMessage.innerHTML = a;
 					if (b) {
@@ -1447,11 +1432,11 @@ function setupSocket(a: Socket) {
 			};
 		}
 	});
-	a.on("dbClanCreateR", function (a, d) {
+	a.on("dbClanCreateR", (a, d) => {
 		if (d) {
 			clanSignUp.style.display = "none";
 			clanStats.style.display = "block";
-			clanHeader.innerHTML = "[" + a + "] Clan:";
+			clanHeader.innerHTML = `[${a}] Clan:`;
 			clanAdminPanel.style.display = "block";
 			leaveClanButton.style.display = "inline-block";
 			leaveClanButton.innerHTML = "DELETE CLAN";
@@ -1460,11 +1445,11 @@ function setupSocket(a: Socket) {
 			clanDBMessage.innerHTML = a;
 		}
 	});
-	a.on("dbClanJoinR", function (a, d) {
+	a.on("dbClanJoinR", (a, d) => {
 		if (d) {
 			clanSignUp.style.display = "none";
 			clanStats.style.display = "block";
-			clanHeader.innerHTML = "[" + a + "] Clan:";
+			clanHeader.innerHTML = `[${a}] Clan:`;
 			player.account.clan = a;
 			var b = findUserByIndex(player.index);
 			if (b) {
@@ -1477,15 +1462,15 @@ function setupSocket(a: Socket) {
 			clanDBMessage.innerHTML = a;
 		}
 	});
-	a.on("dbClanInvR", function (a, d) {
+	a.on("dbClanInvR", (a, d) => {
 		clanInvMessage.style.display = "block";
 		clanInvMessage.innerHTML = a;
 	});
-	a.on("dbKickInvR", function (a, d) {
+	a.on("dbKickInvR", (a, d) => {
 		clanInvMessage.style.display = "block";
 		clanInvMessage.innerHTML = a;
 	});
-	a.on("dbClanLevR", function (a, d) {
+	a.on("dbClanLevR", (a, d) => {
 		if (d) {
 			clanSignUp.style.display = "block";
 			clanStats.style.display = "none";
@@ -1495,18 +1480,17 @@ function setupSocket(a: Socket) {
 			leaveClanButton.style.display = "none";
 		}
 	});
-	a.on("dbChatR", function (a, d) {
+	a.on("dbChatR", (a, d) => {
 		clanChtMessage.style.display = "inline-block";
 		clanChtMessage.innerHTML = a.text;
 		if (d) {
 			if (!a.newURL.match(/^https?:\/\//i)) {
-				a.newURL = "http://" + a.newURL;
+				a.newURL = `http://${a.newURL}`;
 			}
-			clanChatLink.innerHTML =
-				"<a target='_blank' href='" + a.newURL + "'>Clan Chat</a>";
+			clanChatLink.innerHTML = `<a target='_blank' href='${a.newURL}'>Clan Chat</a>`;
 		}
 	});
-	a.on("dbChangeUserR", function (a, d) {
+	a.on("dbChangeUserR", (a, d) => {
 		if (d) {
 			setCookie("userName", a);
 			player.account.user_name = a;
@@ -1515,13 +1499,13 @@ function setupSocket(a: Socket) {
 			editProfileMessage.innerHTML = a;
 		}
 	});
-	a.on("dbClanStats", function (a) {
+	a.on("dbClanStats", (a) => {
 		updateClanPage(a);
 	});
-	a.on("updAccStat", function (a) {
+	a.on("updAccStat", (a) => {
 		updateAccountPage(a);
 	});
-	a.on("gameSetup", function (a, d, e) {
+	a.on("gameSetup", (a, d, e) => {
 		a = JSON.parse(a);
 		if (d) {
 			gameMap = a.mapData;
@@ -1572,7 +1556,7 @@ function setupSocket(a: Socket) {
 		}
 		updateWeaponUI(player, true);
 		if (inMainMenu) {
-			$("#loadingWrapper").fadeOut(0, function () {});
+			$("#loadingWrapper").fadeOut(0, () => {});
 			inMainMenu = false;
 		}
 		startingGame = false;
@@ -1591,10 +1575,10 @@ function setupSocket(a: Socket) {
 	a.on("crtSpr", createSpray);
 	a.on("rem", removeUser);
 	a.on("cht", messageFromServer);
-	a.on("kick", function (a) {
+	a.on("kick", (a) => {
 		kickPlayer(a);
 	});
-	a.on("1", function (a) {
+	a.on("1", (a) => {
 		var b = findUserByIndex(a.gID);
 		var e = mathABS(a.amount);
 		if (
@@ -1614,7 +1598,7 @@ function setupSocket(a: Socket) {
 		) {
 			if (a.amount < 0) {
 				startMovingAnimText(
-					e + "",
+					`${e}`,
 					b.x - b.width / 2,
 					b.y - b.height,
 					"#d95151",
@@ -1622,7 +1606,7 @@ function setupSocket(a: Socket) {
 				);
 			} else {
 				startMovingAnimText(
-					e + "",
+					`${e}`,
 					b.x - b.width / 2,
 					b.y - b.height,
 					"#5ed951",
@@ -1661,7 +1645,7 @@ function setupSocket(a: Socket) {
 	a.on("2", someoneShot);
 	a.on("jum", otherJump);
 	a.on("ex", createExplosion);
-	a.on("r", function (a) {
+	a.on("r", (a) => {
 		var b = findUserByIndex(player.index);
 		if (b != null) {
 			/*
@@ -1675,7 +1659,7 @@ function setupSocket(a: Socket) {
 			updateUiStats(b);
 		}
 	});
-	a.on("3", function (a) {
+	a.on("3", (a) => {
 		var b = findUserByIndex(a.gID);
 		var e = findUserByIndex(a.dID);
 		b.dead = true;
@@ -1683,7 +1667,7 @@ function setupSocket(a: Socket) {
 			if (a.dID == player.index) {
 				startBigAnimText(
 					"BOSS SLAIN",
-					a.sS + " POINTS",
+					`${a.sS} POINTS`,
 					2000,
 					true,
 					"#ffffff",
@@ -1692,13 +1676,13 @@ function setupSocket(a: Socket) {
 					1.25,
 				);
 			} else {
-				showNotification(e.name + " slayed the boss");
+				showNotification(`${e.name} slayed the boss`);
 			}
 		} else if (a.dID == player.index && a.gID != player.index) {
 			playSound("kill1", e.x, e.y);
 			var f = "";
 			if (b.team != e.team) {
-				a.sS = "+" + a.sS;
+				a.sS = `+${a.sS}`;
 				f =
 					a.kd <= 1 || a.kd == undefined
 						? "Enemy Killed"
@@ -1724,7 +1708,7 @@ function setupSocket(a: Socket) {
 			}
 			startBigAnimText(
 				f,
-				a.sS + " POINTS",
+				`${a.sS} POINTS`,
 				2000,
 				true,
 				"#ffffff",
@@ -1741,7 +1725,7 @@ function setupSocket(a: Socket) {
 			try {
 				googletag.pubads().refresh();
 			} catch (h) {}
-			window.setTimeout(function () {
+			window.setTimeout(() => {
 				if (!gameOver) {
 					document.getElementById("startMenuWrapper").style.display = "block";
 					document.getElementById("linkBox").style.display = "block";
@@ -1751,7 +1735,7 @@ function setupSocket(a: Socket) {
 			startSoundTrack(1);
 		}
 	});
-	a.on("4", function (a, d, e) {
+	a.on("4", (a, d, e) => {
 		if (e == 0) {
 			if (gameMap != null && a.active != undefined) {
 				gameMap.pickups[d].active = a.active;
@@ -1772,18 +1756,18 @@ function setupSocket(a: Socket) {
 			}
 		}
 	});
-	a.on("tprt", function (a) {
+	a.on("tprt", (a) => {
 		var b = findUserByIndex(a.indx);
-		if (b != undefined) {
+		if (b !== undefined) {
 			b.x = a.newX;
 			b.y = a.newY;
 			createSmokePuff(b.x, b.y, 5, false, 1);
-			if (a.indx == player.index) {
+			if (a.indx === player.index) {
 				player.x = a.newX;
 				player.y = a.newY;
 				startBigAnimText(
 					"ZONE ENTERED",
-					"+" + a.scor + " POINTS",
+					`+${a.scor} POINTS`,
 					2000,
 					true,
 					"#ffffff",
@@ -1793,19 +1777,19 @@ function setupSocket(a: Socket) {
 				);
 			} else {
 				createSmokePuff(a.oldX, a.oldY, 5, false, 1);
-				showNotification(b.name + " scored");
+				showNotification(`${b.name} scored`);
 			}
 		}
 	});
-	a.on("5", function (a) {
+	a.on("5", (a) => {
 		showNotification(a);
 	});
-	a.on("6", function (a, d, e) {
+	a.on("6", (a, d, e) => {
 		if (!player.dead) {
 			startBigAnimText(a, d, 2000, true, "#ffffff", "#5151d9", true, e);
 		}
 	});
-	a.on("7", function (a, d, e, f) {
+	a.on("7", (a, d, e, f) => {
 		try {
 			gameOver = true;
 			document.getElementById("startMenuWrapper").style.display = "none";
@@ -1818,16 +1802,16 @@ function setupSocket(a: Socket) {
 			googletag.pubads().refresh();
 		} catch (h) {}
 	});
-	a.on("8", function (a) {
+	a.on("8", (a) => {
 		document.getElementById("nextGameTimer").innerHTML =
-			a + ": UNTIL NEXT ROUND";
+			`${a}: UNTIL NEXT ROUND`;
 	});
 }
 function likePlayerStat(a) {
 	socket.emit("like", a);
 }
 function updateVoteStats(a) {
-	document.getElementById("votesText" + a.i).innerHTML = a.n + ": " + a.v;
+	document.getElementById(`votesText${a.i}`).innerHTML = `${a.n}: ${a.v}`;
 }
 function showESCMenu() {
 	deactiveAllAnimTexts();
@@ -1880,27 +1864,25 @@ function showStatTable(a, b, d, e, f, h) {
 				for (var g = 0; g < b.length; ++g) {
 					d = document.createElement("button");
 					d.className = "modeVoteButton";
-					d.setAttribute("id", "votesText" + g);
-					d.innerHTML = b[g].name + ": " + b[g].votes;
+					d.setAttribute("id", `votesText${g}`);
+					d.innerHTML = `${b[g].name}: ${b[g].votes}`;
 					document.getElementById("voteModeContainer").appendChild(d);
-					d.onclick = (function (a, d) {
-						return function () {
-							mainCanvas.focus();
-							socket.emit("modeVote", a.indx);
-							for (var e = 0; e < b.length; ++e) {
-								if (
-									d == e &&
-									document.getElementById("votesText" + e).className ==
-										"modeVoteButton"
-								) {
-									document.getElementById("votesText" + e).className =
-										"modeVoteButtonA";
-								} else {
-									document.getElementById("votesText" + e).className =
-										"modeVoteButton";
-								}
+					d.onclick = ((a, d) => () => {
+						mainCanvas.focus();
+						socket.emit("modeVote", a.indx);
+						for (var e = 0; e < b.length; ++e) {
+							if (
+								d === e &&
+								document.getElementById(`votesText${e}`).className ===
+									"modeVoteButton"
+							) {
+								document.getElementById(`votesText${e}`).className =
+									"modeVoteButtonA";
+							} else {
+								document.getElementById(`votesText${e}`).className =
+									"modeVoteButton";
 							}
-						};
+						}
 					})(b[g], g);
 				}
 			}
@@ -1936,7 +1918,7 @@ function showStatTable(a, b, d, e, f, h) {
 					color: "#fff",
 				},
 				{
-					text: gameMode.code == "zmtch" ? "GOALS" : "HEALING",
+					text: gameMode.code === "zmtch" ? "GOALS" : "HEALING",
 					className: "headerC",
 					color: "#fff",
 				},
@@ -1954,7 +1936,7 @@ function showStatTable(a, b, d, e, f, h) {
 			true,
 		);
 		for (g = 0; g < a.length; ++g) {
-			if (a[g].team != "") {
+			if (a[g].team !== "") {
 				addRowToStatTable(
 					[
 						{
@@ -2018,7 +2000,7 @@ function showStatTable(a, b, d, e, f, h) {
 							className: "contC",
 							color: "#fff",
 							pos: a[g].index,
-							id: "likeStat" + a[g].index,
+							id: `likeStat${a[g].index}`,
 							uID: a[g].id,
 						},
 					],
@@ -2037,10 +2019,10 @@ function showStatTable(a, b, d, e, f, h) {
 				hideStatTable();
 				hideUI(false);
 				animateOverlay = true;
-				window.setTimeout(function () {
+				window.setTimeout(() => {
 					gameOverFade = true;
 				}, 2500);
-				window.setTimeout(function () {
+				window.setTimeout(() => {
 					document.getElementById("gameStatWrapper").style.display = "block";
 				}, 4500);
 			}
@@ -2128,7 +2110,7 @@ function addRowToStatTable(a, b) {
 			}
 			if (h.className == "contL" && a[f].canClick) {
 				h.userTarget = a[f].text;
-				h.addEventListener("click", function (a) {
+				h.addEventListener("click", (a) => {
 					showUserStatPage(a.target.userTarget);
 				});
 			}
@@ -2144,7 +2126,7 @@ function addRowToStatTable(a, b) {
 				likePlayerStat(m.pos);
 				for (var a = 0; a < buttonCount; ++a) {
 					document
-						.getElementById("gameStatLikeButton" + a)
+						.getElementById(`gameStatLikeButton${a}`)
 						.setAttribute("class", "gameStatLikeButton");
 				}
 				if (currentLikeButton != this.tmpCont.uID) {
@@ -2154,7 +2136,7 @@ function addRowToStatTable(a, b) {
 					currentLikeButton = "";
 				}
 			};
-			g.setAttribute("id", "gameStatLikeButton" + buttonCount);
+			g.setAttribute("id", `gameStatLikeButton${buttonCount}`);
 			buttonCount++;
 			if (m.uID == currentLikeButton) {
 				g.setAttribute("class", "gameStatLikeButtonA");
@@ -2264,8 +2246,8 @@ function updateUserValue(a) {
 			if (gameOver) {
 				if (a.l != undefined) {
 					a = document.createTextNode(tmpUser.likes);
-					document.getElementById("likeStat" + tmpUser.index).innerHTML = "";
-					document.getElementById("likeStat" + tmpUser.index).appendChild(a);
+					document.getElementById(`likeStat${tmpUser.index}`).innerHTML = "";
+					document.getElementById(`likeStat${tmpUser.index}`).appendChild(a);
 				}
 			} else {
 				showStatTable(getUsersList(), null, null, true, true, false);
@@ -2397,44 +2379,43 @@ var currentHat = document.getElementById("currentHat");
 var hatList = document.getElementById("hatList");
 var hatHeader = document.getElementById("hatHeader");
 function updateHatList(a, b) {
-	var d = "SELECT HAT: (" + b.length + "/" + a + ")";
-	hatHeader.innerHTML = d;
-	var d =
+	hatHeader.innerHTML = `SELECT HAT: (${b.length}/${a})`;
+	var content =
 		"<div class='hatSelectItem' id='hatItem-1' onclick='changeHat(-1);'>Default</div>";
-	for (var e = 0; e < b.length; ++e) {
-		d +=
+	for (let i = 0; i < b.length; ++i) {
+		content +=
 			"<div class='hatSelectItem' id='hatItem" +
-			b[e].id +
+			b[i].id +
 			"' style='color:" +
-			getItemRarityColor(b[e].chance) +
+			getItemRarityColor(b[i].chance) +
 			";' onclick='changeHat(" +
-			b[e].id +
+			b[i].id +
 			");'>" +
-			b[e].name +
+			b[i].name +
 			" x" +
-			(parseInt(b[e].count) + 1) +
+			(parseInt(b[i].count) + 1) +
 			"<div class='hoverTooltip'><image class='itemDisplayImage' src='.././images/hats/" +
-			b[e].id +
+			b[i].id +
 			"/d.png'></image><div style='color:" +
-			getItemRarityColor(b[e].chance) +
+			getItemRarityColor(b[i].chance) +
 			"; font-size:16px; margin-top:5px;'>" +
-			b[e].name +
+			b[i].name +
 			"</div><div style='color:#ffd100; font-size:12px; margin-top:0px;'>droprate " +
-			b[e].chance +
+			b[i].chance +
 			"%</div><div style='font-size:8px; color:#d8d8d8; margin-top:1px;'><i>wearable</i></div><div style='font-size:12px; margin-top:5px;'>" +
-			b[e].desc +
+			b[i].desc +
 			"</div>" +
-			(b[e].creator == "EatMyApples"
+			(b[i].creator == "EatMyApples"
 				? ""
 				: "<div style='font-size:8px; color:#d8d8d8; margin-top:5px;'><i>Artist: " +
-					b[e].creator +
+					b[i].creator +
 					"</i></div>") +
 			"</div></div>";
 	}
-	hatList.innerHTML = d;
+	hatList.innerHTML = content;
 }
 function resetHatList() {
-	hatHeader.innerHTML = "SELECT HAT";
+	hatHeader.textContent = "SELECT HAT";
 	hatList.innerHTML =
 		"<div class='hatSelectItem' id='hatItem-1' onclick='changeHat(-1);'>Default</div>";
 	changeHat(-1);
@@ -2454,8 +2435,8 @@ function changeHat(a) {
 	if (socket != undefined) {
 		socket.emit("cHat", a);
 		setCookie("previousHat", a);
-		currentHat.innerHTML = document.getElementById("hatItem" + a).innerHTML;
-		currentHat.style.color = document.getElementById("hatItem" + a).style.color;
+		currentHat.innerHTML = document.getElementById(`hatItem${a}`).innerHTML;
+		currentHat.style.color = document.getElementById(`hatItem${a}`).style.color;
 		charSelectorCont.style.display = "block";
 		lobbySelectorCont.style.display = "block";
 		classSelector.style.display = "none";
@@ -2470,7 +2451,7 @@ var currentShirt = document.getElementById("currentShirt");
 var shirtList = document.getElementById("shirtList");
 var shirtHeader = document.getElementById("shirtHeader");
 function updateShirtList(a, b) {
-	var d = "SELECT SHIRT: (" + b.length + "/" + a + ")";
+	var d = `SELECT SHIRT: (${b.length}/${a})`;
 	shirtHeader.innerHTML = d;
 	var d =
 		"<div class='hatSelectItem' id='shirtItem-1' onclick='changeShirt(-1);'>Default</div>";
@@ -2521,9 +2502,9 @@ function changeShirt(a) {
 	if (socket != undefined) {
 		socket.emit("cShirt", a);
 		setCookie("previousShirt", a);
-		currentShirt.innerHTML = document.getElementById("shirtItem" + a).innerHTML;
+		currentShirt.innerHTML = document.getElementById(`shirtItem${a}`).innerHTML;
 		currentShirt.style.color = document.getElementById(
-			"shirtItem" + a,
+			`shirtItem${a}`,
 		).style.color;
 		charSelectorCont.style.display = "block";
 		lobbySelectorCont.style.display = "block";
@@ -2582,11 +2563,11 @@ function changeSpray(a, b) {
 	if (socket != undefined) {
 		socket.emit("cSpray", a);
 		setCookie("previousSpray", a);
-		currentSpray.innerHTML = document.getElementById("sprayItem" + a).innerHTML;
+		currentSpray.innerHTML = document.getElementById(`sprayItem${a}`).innerHTML;
 		currentSpray.style.color = document.getElementById(
-			"sprayItem" + a,
+			`sprayItem${a}`,
 		).style.color;
-		document.getElementById("sprayHoverImage" + a).innerHTML =
+		document.getElementById(`sprayHoverImage${a}`).innerHTML =
 			"<image class='sprayDisplayImage' src='.././images/sprays/" +
 			b +
 			".png'></image>";
@@ -2661,9 +2642,7 @@ function updateLeaderboard(a) {
 						d +
 						". " +
 						player.name +
-						(player.account.clan != ""
-							? " [" + player.account.clan + "]"
-							: "") +
+						(player.account.clan != "" ? ` [${player.account.clan}]` : "") +
 						"</span>";
 				} else if (tmpPlayer.name != "") {
 					b +=
@@ -2675,7 +2654,7 @@ function updateLeaderboard(a) {
 						tmpPlayer.name +
 						"</span>" +
 						(tmpPlayer.account.clan != ""
-							? "<span class='me'> [" + tmpPlayer.account.clan + "]</span>"
+							? `<span class='me'> [${tmpPlayer.account.clan}]</span>`
 							: "");
 				}
 				d++;
@@ -2695,20 +2674,20 @@ function updateTeamScores(a, b) {
 				e.innerHTML = "A";
 				h.style.display = "";
 				if (player.team == "red") {
-					d.setAttribute("style", "display:block;width:" + b + "%");
-					d.style.width = b + "%";
-					f.setAttribute("style", "display:block;width:" + a + "%");
-					f.style.width = a + "%";
+					d.setAttribute("style", `display:block;width:${b}%`);
+					d.style.width = `${b}%`;
+					f.setAttribute("style", `display:block;width:${a}%`);
+					f.style.width = `${a}%`;
 				} else {
-					d.setAttribute("style", "display:block;width:" + a + "%");
-					d.style.width = a + "%";
-					f.setAttribute("style", "display:block;width:" + b + "%");
-					f.style.width = b + "%";
+					d.setAttribute("style", `display:block;width:${a}%`);
+					d.style.width = `${a}%`;
+					f.setAttribute("style", `display:block;width:${b}%`);
+					f.style.width = `${b}%`;
 				}
 			} else {
 				b = mathRound((player.score / a) * 100);
-				f.setAttribute("style", "display:block;width:" + b + "%");
-				f.style.width = b + "%";
+				f.setAttribute("style", `display:block;width:${b}%`);
+				f.style.width = `${b}%`;
 				e.innerHTML = "YOU";
 				h.style.display = "none";
 			}
@@ -2769,7 +2748,7 @@ function updateGameLoop() {
 	fpsUpdateUICounter--;
 	if (fpsUpdateUICounter <= 0) {
 		currentFPS = mathRound(1000 / delta);
-		fpsText.innerHTML = "FPS " + currentFPS;
+		fpsText.innerHTML = `FPS ${currentFPS}`;
 		fpsUpdateUICounter = targetFPS;
 	}
 	oldTime = currentTime;
@@ -3068,9 +3047,9 @@ function resize() {
 		(screenHeight - maxScreenHeight * a) / 2,
 	);
 	document.getElementById("startMenuWrapper").style.transform =
-		"perspective(1px) translate(-50%, -50%) scale(" + uiScale + ")";
+		`perspective(1px) translate(-50%, -50%) scale(${uiScale})`;
 	document.getElementById("gameStatWrapper").style.transform =
-		"perspective(1px) translate(-50%, -50%) scale(" + uiScale + ")";
+		`perspective(1px) translate(-50%, -50%) scale(${uiScale})`;
 	graph.imageSmoothingEnabled = false;
 	graph.webkitImageSmoothingEnabled = false;
 	graph.mozImageSmoothingEnabled = false;
@@ -3096,6 +3075,42 @@ function drawEdgeShader() {
 		graph.fillRect(0, 0, maxScreenWidth, maxScreenHeight);
 	} catch (a) {}
 }
+
+class FlashGlow {
+	initScale = 0;
+	scale = 0;
+	y = 0;
+	x = 0;
+	active = false;
+	maxDuration = 0;
+	duration = 0;
+
+	update(a) {
+		if (!(this.active && this.maxDuration > 0)) return;
+		this.duration += a;
+		this.tmpScale = 1 - this.duration / this.maxDuration;
+		this.tmpScale = this.tmpScale < 0 ? 0 : this.tmpScale;
+		this.scale = this.initScale * this.tmpScale;
+		if (this.scale < 1) {
+			this.active = false;
+		}
+		if (this.duration >= this.maxDuration) {
+			this.active = false;
+		}
+	}
+
+	draw() {
+		if (!this.active) return;
+		graph.drawImage(
+			lightSprite,
+			this.x - startX - this.scale / 2,
+			this.y - startY - this.scale / 2,
+			this.scale,
+			this.scale,
+		);
+	}
+}
+
 var tmpObject = null;
 var tmpBulletGlowWidth = 0;
 var tmpBulletGlowHeight = 0;
@@ -3104,39 +3119,10 @@ var lightY = 0;
 var glowIntensity = 0.2;
 var flashGlows = [];
 var glowIndex = 0;
-for (var i = 0; i < 30; ++i) {
+for (let i = 0; i < 30; ++i) {
 	flashGlows.push(new FlashGlow());
 }
-function FlashGlow() {
-	this.initScale = this.scale = this.y = this.x = 0;
-	this.active = false;
-	this.maxDuration = this.duration = 0;
-	this.update = function (a) {
-		if (this.active && this.maxDuration > 0) {
-			this.duration += a;
-			this.tmpScale = 1 - this.duration / this.maxDuration;
-			this.tmpScale = this.tmpScale < 0 ? 0 : this.tmpScale;
-			this.scale = this.initScale * this.tmpScale;
-			if (this.scale < 1) {
-				this.active = false;
-			}
-			if (this.duration >= this.maxDuration) {
-				this.active = false;
-			}
-		}
-	};
-	this.draw = function () {
-		if (this.active) {
-			graph.drawImage(
-				lightSprite,
-				this.x - startX - this.scale / 2,
-				this.y - startY - this.scale / 2,
-				this.scale,
-				this.scale,
-			);
-		}
-	};
-}
+
 var tmpGlow = null;
 function createFlash(a, b, d) {
 	glowIndex++;
@@ -3156,8 +3142,8 @@ function drawGameLights(a) {
 	if (lightSprite != null) {
 		graph.globalCompositeOperation = "lighter";
 		graph.globalAlpha = 0.2;
-		for (var b = 0; b < bullets.length; b++) {
-			tmpObject = bullets[b];
+		for (let i = 0; i < bullets.length; i++) {
+			tmpObject = bullets[i];
 			if (showGlows && tmpObject.spriteIndex != 2 && tmpObject.active) {
 				tmpBulletGlowWidth =
 					tmpObject.glowWidth || mathMIN(200, tmpObject.width * 14);
@@ -3186,9 +3172,8 @@ function drawGameLights(a) {
 		}
 		if (showGlows) {
 			graph.globalAlpha = 0.2;
-			b = 0;
-			for (; b < flashGlows.length; ++b) {
-				tmpObject = flashGlows[b];
+			for (let i = 0; i < flashGlows.length; ++i) {
+				tmpObject = flashGlows[i];
 				tmpObject.update(a);
 				tmpObject.draw();
 			}
@@ -3248,7 +3233,6 @@ function getCachedMiniMap() {
 	return cachedMiniMap;
 }
 function drawMiniMap() {
-	mapCanvas.width = mapCanvas.width;
 	var a = getCachedMiniMap();
 	if (a != null) {
 		mapContext.drawImage(a, 0, 0, mapScale, mapScale);
@@ -3313,7 +3297,7 @@ function calculateUIScale() {
 		1.25;
 }
 function drawMenuBackground() {}
-function IsImageOk(a) {
+function isImageOk(a) {
 	if (a.complete && a.naturalWidth !== 0) {
 		return true;
 	} else {
@@ -3361,7 +3345,7 @@ function createSpray(a, b, d) {
 			f.active = false;
 			f.xPos = 0;
 			f.yPos = 0;
-			f.onload = function () {
+			f.onload = () => {
 				cacheSpray(f);
 			};
 			userSprays.push(f);
@@ -3373,7 +3357,7 @@ function createSpray(a, b, d) {
 		tmpSpray.resolution = tmpPlayer.spray.info.resolution;
 		tmpSpray.xPos = b - tmpSpray.scale / 2;
 		tmpSpray.yPos = d - tmpSpray.scale / 2;
-		if (tmpSpray.src != tmpPlayer.spray.src) {
+		if (tmpSpray.src !== tmpPlayer.spray.src) {
 			tmpSpray.src = tmpPlayer.spray.src;
 		}
 	}
@@ -3382,15 +3366,15 @@ function sendSpray() {
 	socket.emit("crtSpr");
 }
 function deactivateSprays() {
-	for (var a = 0; a < userSprays.length; ++a) {
-		userSprays[a].active = false;
+	for (let i = 0; i < userSprays.length; ++i) {
+		userSprays[i].active = false;
 	}
 }
 var tmpIndex = 0;
 function cacheSpray(a) {
-	tmpIndex = "" + a.src;
+	tmpIndex = `${a.src}`;
 	tmpSpray = cachedSprays[tmpIndex];
-	if (tmpSpray == undefined && a.width != 0) {
+	if (tmpSpray == undefined && a.width !== 0) {
 		var b = document.createElement("canvas");
 		var d = b.getContext("2d");
 		b.width = a.resolution;
@@ -3411,14 +3395,14 @@ function cacheSpray(a) {
 }
 function drawSprays() {
 	if (showSprays) {
-		for (var a = 0; a < userSprays.length; ++a) {
-			if (userSprays[a].active) {
-				tmpSpray = cachedSprays["" + userSprays[a].src];
+		for (let i = 0; i < userSprays.length; ++i) {
+			if (userSprays[i].active) {
+				tmpSpray = cachedSprays[`${userSprays[i].src}`];
 				if (tmpSpray != undefined) {
 					graph.drawImage(
 						tmpSpray,
-						userSprays[a].xPos - startX,
-						userSprays[a].yPos - startY,
+						userSprays[i].xPos - startX,
+						userSprays[i].yPos - startY,
 					);
 				}
 			}
@@ -3528,7 +3512,7 @@ var soundList = [
 		id: "track1",
 		sound: null,
 		loop: true,
-		onload: function () {
+		onload: () => {
 			tmpList.track1.sound.play();
 			if (!player.dead || startingGame) {
 				tmpList.track1.sound.mute();
@@ -3542,7 +3526,7 @@ var soundList = [
 		id: "track2",
 		sound: null,
 		loop: true,
-		onload: function () {
+		onload: () => {
 			tmpList.track2.sound.play();
 			if (player.dead || !gameStart || gameOver) {
 				tmpList.track2.sound.mute();
@@ -3560,10 +3544,10 @@ function loadSounds(a) {
 		return false;
 	}
 	tmpList = [];
-	for (var b = 0; b < soundList.length; ++b) {
-		tmpSound = localStorage.getItem(a + soundList[b].loc + "data");
-		tmpFormat = localStorage.getItem(a + soundList[b].loc + "format");
-		loadSound(tmpSound, soundList[b], tmpFormat);
+	for (let i = 0; i < soundList.length; ++i) {
+		tmpSound = localStorage.getItem(`${a + soundList[i].loc}data`);
+		tmpFormat = localStorage.getItem(`${a + soundList[i].loc}format`);
+		loadSound(tmpSound, soundList[i], tmpFormat);
 	}
 }
 function loadSound(a, b, d) {
@@ -3575,7 +3559,7 @@ function loadSound(a, b, d) {
 		urls: [a],
 		format: [d],
 		loop: b.loop,
-		onload: b.onload || function () {},
+		onload: b.onload || (() => {}),
 	});
 }
 var currentTrack = 0;
@@ -3624,8 +3608,8 @@ function stopAllSounds() {
 	if (!doSounds) {
 		return false;
 	}
-	for (var a = 0; a < soundList.length; ++a) {
-		tmpList[soundList[a].id].sound.stop();
+	for (let i = 0; i < soundList.length; ++i) {
+		tmpList[soundList[i].id].sound.stop();
 	}
 }
 var spritesLoaded = false;
@@ -3636,16 +3620,16 @@ function getSprite(a) {
 	b.index = spriteIndex;
 	b.flipped = false;
 	b.isLoaded = false;
-	b.onload = function () {
+	b.onload = () => {
 		b.isLoaded = true;
 		b.onload = null;
 	};
-	b.onerror = function () {
+	b.onerror = () => {
 		b.isLoaded = false;
-		console.log("File not Found: " + a + ".png");
+		console.log(`File not Found: ${a}.png`);
 	};
 	try {
-		tmpPicture = localStorage.getItem(a + ".png");
+		tmpPicture = localStorage.getItem(`${a}.png`);
 		b.src = tmpPicture;
 		b.crossOrigin = "anonymous";
 	} catch (d) {
@@ -3802,7 +3786,7 @@ function Projectile() {
 							h < gameObjects.length &&
 							((k = gameObjects[h]),
 							k.index == this.owner.index ||
-								!(this.lastHit.indexOf("," + k.index + ",") < 0) ||
+								!(this.lastHit.indexOf(`,${k.index},`) < 0) ||
 								k.team == this.owner.team ||
 								k.type != "player" ||
 								!k.onScreen ||
@@ -3818,7 +3802,7 @@ function Projectile() {
 									(this.explodeOnDeath
 										? (this.active = false)
 										: this.dmg > 0 &&
-											((this.lastHit += k.index + ","),
+											((this.lastHit += `${k.index},`),
 											this.spriteIndex != 2 &&
 												(particleCone(
 													12,
@@ -3862,7 +3846,7 @@ function Projectile() {
 		this.skipMove = true;
 		this.lastHit = ",";
 		this.active = true;
-		playSound("shot" + this.weaponIndex, this.x, this.y);
+		playSound(`shot${this.weaponIndex}`, this.x, this.y);
 	};
 	var f = 0;
 	var h = 0;
@@ -3942,9 +3926,8 @@ function Projectile() {
 		}
 		return true;
 	};
-	this.dotInRect = function (a, b, d, e, f, h) {
-		return a >= d && a <= d + f && b >= e && b <= e + h;
-	};
+	this.dotInRect = (a, b, d, e, f, h) =>
+		a >= d && a <= d + f && b >= e && b <= e + h;
 	this.adjustOnCollision = function (a, b, d, e) {
 		for (var f = 100, h = this.cEndX, g = this.cEndY; f > 0; ) {
 			f--;
@@ -4007,14 +3990,14 @@ function updateWeaponUI(a, b) {
 	if (actionBar.innerHTML == "") {
 		for (var d = 0; d < a.weapons.length; ++d) {
 			var e = document.createElement("div");
-			e.id = "actionContainer" + d;
+			e.id = `actionContainer${d}`;
 			e.className =
 				d == a.currentWeapon ? "actionContainerActive" : "actionContainer";
 			tmpDiv = weaponSpriteSheet[a.weapons[d].weaponIndex].icon;
 			if (tmpDiv != undefined) {
 				tmpDiv.className = "actionItem";
 				var f = document.createElement("div");
-				f.id = "actionCooldown" + d;
+				f.id = `actionCooldown${d}`;
 				f.className = "actionCooldown";
 				e.appendChild(f);
 				e.appendChild(tmpDiv);
@@ -4023,7 +4006,7 @@ function updateWeaponUI(a, b) {
 		}
 	} else {
 		for (d = 0; d < a.weapons.length; ++d) {
-			tmpDiv = document.getElementById("actionContainer" + d);
+			tmpDiv = document.getElementById(`actionContainer${d}`);
 			tmpDiv.className =
 				d == a.currentWeapon ? "actionContainerActive" : "actionContainer";
 		}
@@ -4031,10 +4014,10 @@ function updateWeaponUI(a, b) {
 	updateUiStats(a);
 }
 function setCooldownAnimation(a, b, d) {
-	tmpDiv = document.getElementById("actionCooldown" + a);
+	tmpDiv = document.getElementById(`actionCooldown${a}`);
 	if (d) {
 		tmpDiv.style.height = "100%";
-		$("#actionCooldown" + a).animate(
+		$(`#actionCooldown${a}`).animate(
 			{
 				height: "0%",
 			},
@@ -4046,7 +4029,7 @@ function setCooldownAnimation(a, b, d) {
 }
 function shootNextBullet(a, b) {
 	var d = getNextBullet();
-	if (d != undefined) {
+	if (d !== undefined) {
 		d.serverIndex = a.si;
 		d.x = a.x - 1;
 		d.startX = a.x;
@@ -4077,7 +4060,7 @@ function shootNextBullet(a, b) {
 		d.bounce = getCurrentWeapon(b).bounce;
 		d.startTime = currentTime;
 		d.maxLifeTime = getCurrentWeapon(b).maxLife;
-		if (b.index == player.index && getCurrentWeapon(b).distBased) {
+		if (b.index === player.index && getCurrentWeapon(b).distBased) {
 			d.maxLifeTime = target.d / d.speed;
 		}
 		d.glowWidth = getCurrentWeapon(b).glowWidth;
@@ -4091,14 +4074,14 @@ function shootNextBullet(a, b) {
 function shootBullet(a) {
 	if (
 		!a.dead &&
-		getCurrentWeapon(a) != undefined &&
-		a.spawnProtection == 0 &&
+		getCurrentWeapon(a) !== undefined &&
+		a.spawnProtection === 0 &&
 		getCurrentWeapon(a).weaponIndex >= 0 &&
 		getCurrentWeapon(a).reloadTime <= 0 &&
 		getCurrentWeapon(a).ammo > 0
 	) {
 		screenShake(getCurrentWeapon(a).shake, target.f);
-		for (var b = 0; b < getCurrentWeapon(a).bulletsPerShot; ++b) {
+		for (let b = 0; b < getCurrentWeapon(a).bulletsPerShot; ++b) {
 			getCurrentWeapon(a).spreadIndex++;
 			if (
 				getCurrentWeapon(a).spreadIndex >= getCurrentWeapon(a).spread.length
@@ -4131,29 +4114,33 @@ function shootBullet(a) {
 		updateUiStats(a);
 	}
 }
-function playerReload(a, b) {
+function playerReload(player, shouldEmit: boolean) {
 	if (
-		getCurrentWeapon(a).reloadTime <= 0 &&
-		getCurrentWeapon(a).ammo != getCurrentWeapon(a).maxAmmo
+		getCurrentWeapon(player).reloadTime <= 0 &&
+		getCurrentWeapon(player).ammo !== getCurrentWeapon(player).maxAmmo
 	) {
-		getCurrentWeapon(a).reloadTime = getCurrentWeapon(a).reloadSpeed;
-		getCurrentWeapon(a).spreadIndex = 0;
+		getCurrentWeapon(player).reloadTime = getCurrentWeapon(player).reloadSpeed;
+		getCurrentWeapon(player).spreadIndex = 0;
 		showNotification("Reloading");
-		if (b) {
+		if (shouldEmit) {
 			socket.emit("r");
 		}
-		setCooldownAnimation(a.currentWeapon, getCurrentWeapon(a).reloadTime, true);
+		setCooldownAnimation(
+			player.currentWeapon,
+			getCurrentWeapon(player).reloadTime,
+			true,
+		);
 	}
 }
-function findServerBullet(a) {
-	for (var b = 0; b < bullets.length; ++b) {
-		if (bullets[b].serverIndex == a) {
+function findServerBullet(bulletIndex) {
+	for (let b = 0; b < bullets.length; ++b) {
+		if (bullets[b].serverIndex === bulletIndex) {
 			return bullets[b];
 		}
 	}
 }
 function someoneShot(a) {
-	if (a.i != player.index) {
+	if (a.i !== player.index) {
 		tmpPlayer = findUserByIndex(a.i);
 		if (tmpPlayer != null) {
 			shootNextBullet(a, tmpPlayer);
@@ -4219,7 +4206,7 @@ function updateBullets(a) {
 			f = mathRound(h.y - startY);
 			trailGrad = graph.createLinearGradient(b, d, e, f);
 			trailGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
-			trailGrad.addColorStop(1, "rgba(255, 255, 255, " + h.trailAlpha + ")");
+			trailGrad.addColorStop(1, `rgba(255, 255, 255, ${h.trailAlpha})`);
 			graph.strokeStyle = trailGrad;
 			graph.lineWidth = h.trailWidth;
 			graph.beginPath();
@@ -4336,18 +4323,18 @@ var classList = document.getElementById("classList");
 var characterWepnDisplay = document.getElementById("charWpn");
 var characterWepnDisplay2 = document.getElementById("charWpn2");
 function createClassList() {
-	var a = "";
-	for (var b = 0; b < characterClasses.length; ++b) {
-		a +=
+	let res = "";
+	for (let i = 0; i < characterClasses.length; ++i) {
+		res +=
 			"<div class='hatSelectItem' id='classItem" +
-			b +
+			i +
 			"' onclick='pickedCharacter(" +
-			b +
+			i +
 			");'>" +
-			characterClasses[b].classN +
+			characterClasses[i].classN +
 			"</div>";
 	}
-	classList.innerHTML = a;
+	classList.innerHTML = res;
 }
 createClassList();
 function showClassselector() {
@@ -4366,9 +4353,9 @@ function loadSavedClass() {
 }
 function pickedCharacter(a) {
 	currentClassID = a;
-	currentClass.innerHTML = document.getElementById("classItem" + a).innerHTML;
+	currentClass.innerHTML = document.getElementById(`classItem${a}`).innerHTML;
 	currentClass.style.color = document.getElementById(
-		"classItem" + a,
+		`classItem${a}`,
 	).style.color;
 	characterWepnDisplay.innerHTML =
 		"<b>Primary:</b><div class='hatSelectItem' style='display:inline-block'>" +
@@ -4381,7 +4368,7 @@ function pickedCharacter(a) {
 	setCookie("previousClass", a);
 	if (loggedIn) {
 		for (var b = 0; b < characterClasses[a].weaponIndexes.length; ++b) {
-			var d = getCookie("wpnSkn" + characterClasses[a].weaponIndexes[b]);
+			var d = getCookie(`wpnSkn${characterClasses[a].weaponIndexes[b]}`);
 			if (d != "") {
 				changeCamo(characterClasses[a].weaponIndexes[b], parseInt(d), false);
 			}
@@ -4449,7 +4436,7 @@ function showWeaponSelector(a) {
 }
 window.showWeaponSelector = showWeaponSelector;
 function getCamoURL(a) {
-	return ".././images/camos/" + (a + 1) + ".png";
+	return `.././images/camos/${a + 1}.png`;
 }
 function changeCamo(a, b, d) {
 	if (socket != undefined) {
@@ -4458,7 +4445,7 @@ function changeCamo(a, b, d) {
 			camoID: b,
 		});
 		if (d) {
-			setCookie("wpnSkn" + a, b);
+			setCookie(`wpnSkn${a}`, b);
 			charSelectorCont.style.display = "block";
 			lobbySelectorCont.style.display = "block";
 			camoSelector.style.display = "none";
@@ -4492,42 +4479,32 @@ function loadPlayerSpriteArray(a, b) {
 		var f = [];
 		var h = [];
 		var g = [];
-		e.push(getSprite(a + "characters/" + b[d].folderName + "/up"));
-		f.push(getSprite(a + "characters/" + b[d].folderName + "/down"));
-		h.push(getSprite(a + "characters/" + b[d].folderName + "/left"));
-		g.push(getSprite(a + "characters/" + b[d].folderName + "/left"));
+		e.push(getSprite(`${a}characters/${b[d].folderName}/up`));
+		f.push(getSprite(`${a}characters/${b[d].folderName}/down`));
+		h.push(getSprite(`${a}characters/${b[d].folderName}/left`));
+		g.push(getSprite(`${a}characters/${b[d].folderName}/left`));
 		for (var l = 0; l < animLength; ++l) {
 			tmpIndex = l;
-			e.push(
-				getSprite(a + "characters/" + b[d].folderName + "/up" + (tmpIndex + 1)),
-			);
+			e.push(getSprite(`${a}characters/${b[d].folderName}/up${tmpIndex + 1}`));
 			tmpSprite = b[d].hasDown
-				? getSprite(
-						a + "characters/" + b[d].folderName + "/down" + (tmpIndex + 1),
-					)
-				: getSprite(
-						a + "characters/" + b[d].folderName + "/up" + (tmpIndex + 1),
-					);
+				? getSprite(`${a}characters/${b[d].folderName}/down${tmpIndex + 1}`)
+				: getSprite(`${a}characters/${b[d].folderName}/up${tmpIndex + 1}`);
 			f.push(tmpSprite);
 			if (tmpIndex >= 2) {
 				tmpIndex = 0;
 			}
 			h.push(
-				getSprite(
-					a + "characters/" + b[d].folderName + "/left" + (tmpIndex + 1),
-				),
+				getSprite(`${a}characters/${b[d].folderName}/left${tmpIndex + 1}`),
 			);
 			g.push(
-				getSprite(
-					a + "characters/" + b[d].folderName + "/left" + (tmpIndex + 1),
-				),
+				getSprite(`${a}characters/${b[d].folderName}/left${tmpIndex + 1}`),
 			);
 		}
-		var l = getSprite(a + "characters/" + b[d].folderName + "/arm");
-		var m = getSprite(a + "characters/" + b[d].folderName + "/hd");
-		var k = getSprite(a + "characters/" + b[d].folderName + "/hu");
-		var p = getSprite(a + "characters/" + b[d].folderName + "/hl");
-		var n = getSprite(a + "characters/" + b[d].folderName + "/hl");
+		var l = getSprite(`${a}characters/${b[d].folderName}/arm`);
+		var m = getSprite(`${a}characters/${b[d].folderName}/hd`);
+		var k = getSprite(`${a}characters/${b[d].folderName}/hu`);
+		var p = getSprite(`${a}characters/${b[d].folderName}/hl`);
+		var n = getSprite(`${a}characters/${b[d].folderName}/hl`);
 		classSpriteSheets.push({
 			upSprites: e,
 			downSprites: f,
@@ -4573,37 +4550,37 @@ function loadDefaultSprites(a) {
 	particleSprites = [];
 	bulletSprites = [];
 	cachedWeaponSprites = [];
-	flagSprites.push(getSprite(a + "flags/flagb1"));
-	flagSprites.push(getSprite(a + "flags/flagb2"));
-	flagSprites.push(getSprite(a + "flags/flagb3"));
-	flagSprites.push(getSprite(a + "flags/flagr1"));
-	flagSprites.push(getSprite(a + "flags/flagr2"));
-	flagSprites.push(getSprite(a + "flags/flagr3"));
-	clutterSprites.push(getSprite(a + "clutter/crate1"));
-	clutterSprites.push(getSprite(a + "clutter/barrel1"));
-	clutterSprites.push(getSprite(a + "clutter/barrel2"));
-	clutterSprites.push(getSprite(a + "clutter/bottle1"));
-	clutterSprites.push(getSprite(a + "clutter/spike1"));
-	wallSprite = getSprite(a + "wall1");
-	ambientSprites.push(getSprite(a + "ambient1"));
-	darkFillerSprite = getSprite(a + "darkfiller");
-	lightSprite = getSprite(a + "lighting");
-	floorSprites.push(getSprite(a + "ground1"));
-	floorSprites.push(getSprite(a + "ground2"));
-	floorSprites.push(getSprite(a + "ground3"));
-	sideWalkSprite = getSprite(a + "sidewalk1");
-	wallSpritesSeg.push(getSprite(a + "wallSegment1"));
-	wallSpritesSeg.push(getSprite(a + "wallSegment2"));
-	wallSpritesSeg.push(getSprite(a + "wallSegment3"));
-	particleSprites.push(getSprite(a + "particles/blood/blood"));
-	particleSprites.push(getSprite(a + "particles/oil/oil"));
-	particleSprites.push(getSprite(a + "particles/wall"));
-	particleSprites.push(getSprite(a + "particles/hole"));
-	particleSprites.push(getSprite(a + "particles/blood/splatter1"));
-	particleSprites.push(getSprite(a + "particles/blood/splatter2"));
-	particleSprites.push(getSprite(a + "particles/explosion"));
-	healthPackSprite = getSprite(a + "healthpack");
-	lootCrateSprite = getSprite(a + "lootCrate1");
+	flagSprites.push(getSprite(`${a}flags/flagb1`));
+	flagSprites.push(getSprite(`${a}flags/flagb2`));
+	flagSprites.push(getSprite(`${a}flags/flagb3`));
+	flagSprites.push(getSprite(`${a}flags/flagr1`));
+	flagSprites.push(getSprite(`${a}flags/flagr2`));
+	flagSprites.push(getSprite(`${a}flags/flagr3`));
+	clutterSprites.push(getSprite(`${a}clutter/crate1`));
+	clutterSprites.push(getSprite(`${a}clutter/barrel1`));
+	clutterSprites.push(getSprite(`${a}clutter/barrel2`));
+	clutterSprites.push(getSprite(`${a}clutter/bottle1`));
+	clutterSprites.push(getSprite(`${a}clutter/spike1`));
+	wallSprite = getSprite(`${a}wall1`);
+	ambientSprites.push(getSprite(`${a}ambient1`));
+	darkFillerSprite = getSprite(`${a}darkfiller`);
+	lightSprite = getSprite(`${a}lighting`);
+	floorSprites.push(getSprite(`${a}ground1`));
+	floorSprites.push(getSprite(`${a}ground2`));
+	floorSprites.push(getSprite(`${a}ground3`));
+	sideWalkSprite = getSprite(`${a}sidewalk1`);
+	wallSpritesSeg.push(getSprite(`${a}wallSegment1`));
+	wallSpritesSeg.push(getSprite(`${a}wallSegment2`));
+	wallSpritesSeg.push(getSprite(`${a}wallSegment3`));
+	particleSprites.push(getSprite(`${a}particles/blood/blood`));
+	particleSprites.push(getSprite(`${a}particles/oil/oil`));
+	particleSprites.push(getSprite(`${a}particles/wall`));
+	particleSprites.push(getSprite(`${a}particles/hole`));
+	particleSprites.push(getSprite(`${a}particles/blood/splatter1`));
+	particleSprites.push(getSprite(`${a}particles/blood/splatter2`));
+	particleSprites.push(getSprite(`${a}particles/explosion`));
+	healthPackSprite = getSprite(`${a}healthpack`);
+	lootCrateSprite = getSprite(`${a}lootCrate1`);
 	weaponSpriteSheet = [];
 	for (var b = 0; b < weaponNames.length; ++b) {
 		var d;
@@ -4611,11 +4588,11 @@ function loadDefaultSprites(a) {
 		var f;
 		var h;
 		var g;
-		d = getSprite(a + "weapons/" + weaponNames[b] + "/up");
-		e = getSprite(a + "weapons/" + weaponNames[b] + "/up");
-		f = getSprite(a + "weapons/" + weaponNames[b] + "/left");
-		h = getSprite(a + "weapons/" + weaponNames[b] + "/left");
-		g = getSprite(a + "weapons/" + weaponNames[b] + "/icon");
+		d = getSprite(`${a}weapons/${weaponNames[b]}/up`);
+		e = getSprite(`${a}weapons/${weaponNames[b]}/up`);
+		f = getSprite(`${a}weapons/${weaponNames[b]}/left`);
+		h = getSprite(`${a}weapons/${weaponNames[b]}/left`);
+		g = getSprite(`${a}weapons/${weaponNames[b]}/icon`);
 		weaponSpriteSheet.push({
 			upSprite: d,
 			downSprite: e,
@@ -4624,9 +4601,9 @@ function loadDefaultSprites(a) {
 			icon: g,
 		});
 	}
-	bulletSprites.push(getSprite(a + "weapons/bullet"));
-	bulletSprites.push(getSprite(a + "weapons/grenade"));
-	bulletSprites.push(getSprite(a + "weapons/flame"));
+	bulletSprites.push(getSprite(`${a}weapons/bullet`));
+	bulletSprites.push(getSprite(`${a}weapons/grenade`));
+	bulletSprites.push(getSprite(`${a}weapons/flame`));
 	resize();
 }
 var mainTitleText = document.getElementById("mainTitleText");
@@ -4679,7 +4656,7 @@ function loadModPack(a, b) {
 			function e(a) {
 				this.typeName = a;
 				var b = this;
-				this.process = function (a) {
+				this.process = (a) => {
 					try {
 						if (b.typeName.indexOf("modinfo") > -1) {
 							setModInfoText(a);
@@ -4702,7 +4679,7 @@ function loadModPack(a, b) {
 							pickedCharacter(currentClassID);
 						}
 					} catch (t) {
-						console.log("Script Read Error: " + t);
+						console.log(`Script Read Error: ${t}`);
 					}
 					zipFileCloser.close();
 				};
@@ -4717,16 +4694,16 @@ function loadModPack(a, b) {
 						try {
 							this.tmpLocation = d.filename;
 							localStorage.setItem(
-								this.tmpLocation + "data",
+								`${this.tmpLocation}data`,
 								this.soundAsDataURL,
 							);
-							localStorage.setItem(this.tmpLocation + "format", d.format);
+							localStorage.setItem(`${this.tmpLocation}format`, d.format);
 						} catch (r) {
-							console.log("Storage failed: " + r);
+							console.log(`Storage failed: ${r}`);
 						}
 						zipFileCloser.close();
 					} else {
-						console.log("failed to generate url: " + d.filename);
+						console.log(`failed to generate url: ${d.filename}`);
 					}
 				};
 			}
@@ -4740,11 +4717,11 @@ function loadModPack(a, b) {
 							this.tmpLocation = b.filename;
 							localStorage.setItem(this.tmpLocation, this.imgAsDataURL);
 						} catch (n) {
-							console.log("Storage failed: " + n);
+							console.log(`Storage failed: ${n}`);
 						}
 						zipFileCloser.close();
 					} else {
-						console.log("failed to generate url: " + b.filename);
+						console.log(`failed to generate url: ${b.filename}`);
 					}
 				};
 			}
@@ -4761,10 +4738,10 @@ function loadModPack(a, b) {
 				if (isURL(a)) {
 					g = a;
 					if (!g.match(/^https?:\/\//i)) {
-						g = "http://" + g;
+						g = `http://${g}`;
 					}
 				} else {
-					g = "https://dl.dropboxusercontent.com/s/" + a + "/vertixmod.zip";
+					g = `https://dl.dropboxusercontent.com/s/${a}/vertixmod.zip`;
 				}
 			}
 			if (!b) {
@@ -4793,7 +4770,7 @@ function loadModPack(a, b) {
 										processor.process(a);
 									})
 									.catch((t) => {
-										console.log("Script Read Error: " + t);
+										console.log(`Script Read Error: ${t}`);
 									});
 							} else if (l == "sprites") {
 								let processor = new h(g.filename);
@@ -4802,19 +4779,19 @@ function loadModPack(a, b) {
 										processor.process(a);
 									})
 									.catch((n) => {
-										console.log("Image Load Error: " + n);
+										console.log(`Image Load Error: ${n}`);
 									});
 							} else if (l == "sounds") {
 								let processor = new f(
-									g.filename.replace("." + fileFormat, ""),
+									g.filename.replace(`.${fileFormat}`, ""),
 									fileFormat,
 								);
-								g.getData(new zip.BlobWriter("audio/" + fileFormat))
+								g.getData(new zip.BlobWriter(`audio/${fileFormat}`))
 									.then((a) => {
 										processor.process(a);
 									})
 									.catch((r) => {
-										console.log("Sound Load Error: " + r);
+										console.log(`Sound Load Error: ${r}`);
 									});
 							} else {
 								loadingTexturePack = false;
@@ -4877,8 +4854,8 @@ function getHatSprite(a, b) {
 					d.lS = new Image();
 					d.lS.index = spriteIndex;
 					spriteIndex++;
-					d.lS.src = ".././images/hats/" + tmpAcc.hat.id + "/l.png";
-					d.lS.onload = function () {
+					d.lS.src = `.././images/hats/${tmpAcc.hat.id}/l.png`;
+					d.lS.onload = () => {
 						d.imgToLoad--;
 						d.lS.isLoaded = true;
 						d.lS.onload = null;
@@ -4887,8 +4864,8 @@ function getHatSprite(a, b) {
 					d.rS = new Image();
 					d.rS.index = spriteIndex;
 					spriteIndex++;
-					d.rS.src = ".././images/hats/" + tmpAcc.hat.id + "/l.png";
-					d.rS.onload = function () {
+					d.rS.src = `.././images/hats/${tmpAcc.hat.id}/l.png`;
+					d.rS.onload = () => {
 						d.rS = flipSprite(d.rS, true);
 						d.imgToLoad--;
 						d.rS.isLoaded = true;
@@ -4900,8 +4877,8 @@ function getHatSprite(a, b) {
 					d.uS = new Image();
 					d.uS.index = spriteIndex;
 					spriteIndex++;
-					d.uS.src = ".././images/hats/" + tmpAcc.hat.id + "/u.png";
-					d.uS.onload = function () {
+					d.uS.src = `.././images/hats/${tmpAcc.hat.id}/u.png`;
+					d.uS.onload = () => {
 						d.imgToLoad--;
 						d.uS.isLoaded = true;
 						d.uS.onload = null;
@@ -4911,8 +4888,8 @@ function getHatSprite(a, b) {
 				d.dS = new Image();
 				d.dS.index = spriteIndex;
 				spriteIndex++;
-				d.dS.src = ".././images/hats/" + tmpAcc.hat.id + "/d.png";
-				d.dS.onload = function () {
+				d.dS.src = `.././images/hats/${tmpAcc.hat.id}/d.png`;
+				d.dS.onload = () => {
 					d.imgToLoad--;
 					d.dS.isLoaded = true;
 					d.dS.onload = null;
@@ -4972,8 +4949,8 @@ function getShirtSprite(a, b) {
 				d.lS = new Image();
 				d.lS.index = spriteIndex;
 				spriteIndex++;
-				d.lS.src = ".././images/shirts/" + tmpAcc.shirt.id + "/l.png";
-				d.lS.onload = function () {
+				d.lS.src = `.././images/shirts/${tmpAcc.shirt.id}/l.png`;
+				d.lS.onload = () => {
 					d.imgToLoad--;
 					d.lS.isLoaded = true;
 					d.lS.onload = null;
@@ -4982,8 +4959,8 @@ function getShirtSprite(a, b) {
 				d.rS = new Image();
 				d.rS.index = spriteIndex;
 				spriteIndex++;
-				d.rS.src = ".././images/shirts/" + tmpAcc.shirt.id + "/l.png";
-				d.rS.onload = function () {
+				d.rS.src = `.././images/shirts/${tmpAcc.shirt.id}/l.png`;
+				d.rS.onload = () => {
 					d.rS = flipSprite(d.rS, true);
 					d.imgToLoad--;
 					d.rS.isLoaded = true;
@@ -4995,8 +4972,8 @@ function getShirtSprite(a, b) {
 				d.uS = new Image();
 				d.uS.index = spriteIndex;
 				spriteIndex++;
-				d.uS.src = ".././images/shirts/" + tmpAcc.shirt.id + "/u.png";
-				d.uS.onload = function () {
+				d.uS.src = `.././images/shirts/${tmpAcc.shirt.id}/u.png`;
+				d.uS.onload = () => {
 					d.imgToLoad--;
 					d.uS.isLoaded = true;
 					d.uS.onload = null;
@@ -5006,8 +4983,8 @@ function getShirtSprite(a, b) {
 			d.dS = new Image();
 			d.dS.index = spriteIndex;
 			spriteIndex++;
-			d.dS.src = ".././images/shirts/" + tmpAcc.shirt.id + "/d.png";
-			d.dS.onload = function () {
+			d.dS.src = `.././images/shirts/${tmpAcc.shirt.id}/d.png`;
+			d.dS.onload = () => {
 				d.imgToLoad--;
 				d.dS.isLoaded = true;
 				d.dS.onload = null;
@@ -5030,7 +5007,7 @@ function getShirtSprite(a, b) {
 tmpSprite = null;
 tmpIndex = "";
 function getWeaponSprite(a, b, d) {
-	tmpIndex = a + "" + b + "" + d;
+	tmpIndex = `${a}${b}${d}`;
 	tmpSprite = cachedWeaponSprites[tmpIndex];
 	if (tmpSprite == undefined) {
 		var e = null;
@@ -5300,7 +5277,7 @@ function drawGameObjects(a) {
 				}
 				if (b.hitFlash != undefined && b.hitFlash > 0) {
 					playerContext.globalCompositeOperation = "source-atop";
-					playerContext.fillStyle = "rgba(255, 255, 255, " + b.hitFlash + ")";
+					playerContext.fillStyle = `rgba(255, 255, 255, ${b.hitFlash})`;
 					playerContext.fillRect(
 						-playerCanvas.width / 2,
 						-playerCanvas.height / 2,
@@ -5433,7 +5410,7 @@ function drawPlayerNames() {
 				}
 				if (tmpObject.account?.clan != "") {
 					b = renderShadedAnimText(
-						" [" + tmpObject.account?.clan + "]",
+						` [${tmpObject.account?.clan}]`,
 						d * textSizeMult,
 						g,
 						5,
@@ -5802,11 +5779,11 @@ function drawMap(a) {
 				}
 			}
 		}
-		if (a == 0) {
+		if (a === 0) {
 			for (d = 0; d < gameMap.pickups.length; ++d) {
 				b = gameMap.pickups[d];
 				if (b.active && canSee(b.x - startX, b.y - startY, 0, 0)) {
-					if (b.type == "healthpack") {
+					if (b.type === "healthpack") {
 						drawSprite(
 							graph,
 							healthPackSprite,
@@ -5842,7 +5819,7 @@ function drawMap(a) {
 }
 var tmpShadow = null;
 function drawSprite(a, b, d, e, f, h, g, l, m, k, p) {
-	if (b != null && b != undefined && b.width > 0) {
+	if (b != null && b !== undefined && b.width > 0) {
 		d = mathFloor(d);
 		e = mathFloor(e);
 		f = mathFloor(f);
@@ -5894,10 +5871,85 @@ function getCachedShadow(a, b, d, e) {
 function canSee(a, b, d, e) {
 	return a + d > 0 && b + e > 0 && a < maxScreenWidth && b < maxScreenHeight;
 }
+class AnimText {
+	text = "";
+	scaleSpeed = 0;
+	minScale = 0;
+	maxScale = 0;
+	fontSize = 0;
+	scale = 0;
+	ySpeed = 0;
+	xSpeed = 0;
+	y = 0;
+	x = 0;
+	active = false;
+	alpha = 1;
+	fadeSpeed = 0;
+	useStart = false;
+	moveDelay = 0;
+	fadeDelay = 0;
+	removable = false;
+	textType = "";
+	color = "#fff";
+	cachedImage = null;
+
+	update(a) {
+		if (!this.active) return;
+		this.scale += this.scaleSpeed * a;
+		if (this.scaleSpeed > 0) {
+			if (this.scale >= this.maxScale) {
+				this.scale = this.maxScale;
+				this.scaleSpeed *= -1;
+			}
+		} else if (this.scale < this.minScale) {
+			this.scale = this.minScale;
+			this.scaleSpeed = 0;
+		}
+		if (this.moveDelay > 0) {
+			this.moveDelay -= a;
+		} else {
+			this.x += this.xSpeed * a;
+			this.y += this.ySpeed * a;
+		}
+		if (this.fadeDelay > 0) {
+			this.fadeDelay -= a;
+		} else {
+			this.alpha -= this.fadeSpeed * a;
+			if (this.alpha <= 0) {
+				this.alpha = 0;
+				this.active = false;
+			}
+		}
+	}
+
+	draw() {
+		if (!this.active) return;
+		graph.globalAlpha = this.alpha;
+		if (this.useStart) {
+			if (this.cachedImage !== undefined) {
+				graph.drawImage(
+					this.cachedImage,
+					this.x - startX - (this.cachedImage.width / 2) * this.scale,
+					this.y - startY - (this.cachedImage.height / 2) * this.scale,
+					this.cachedImage.width * this.scale,
+					this.cachedImage.height * this.scale,
+				);
+			}
+		} else if (this.cachedImage !== undefined) {
+			graph.drawImage(
+				this.cachedImage,
+				this.x - (this.cachedImage.width / 2) * this.scale,
+				this.y - (this.cachedImage.height / 2) * this.scale,
+				this.cachedImage.width * this.scale,
+				this.cachedImage.height * this.scale,
+			);
+		}
+	}
+}
 var notificationsSize = textSizeMult * 80;
 var notificationsGap = notificationsSize * 1.6;
 var notifications = [];
-for (var i = 0; i < 3; ++i) {
+for (let i = 0; i < 3; ++i) {
 	notifications.push(new AnimText());
 }
 var notificationIndex = 0;
@@ -5969,102 +6021,28 @@ function updateNotifications(a) {
 	graph.globalAlpha = 1;
 }
 var animTexts = [];
-for (var i = 0; i < 20; i++) {
+for (let i = 0; i < 20; i++) {
 	animTexts.push(new AnimText());
 }
 var shadowOffset = 6;
 var tmpDrawText = null;
-function AnimText() {
-	this.text = "";
-	this.scaleSpeed =
-		this.minScale =
-		this.maxScale =
-		this.fontSize =
-		this.scale =
-		this.ySpeed =
-		this.xSpeed =
-		this.y =
-		this.x =
-			0;
-	this.active = false;
-	this.alpha = 1;
-	this.fadeSpeed = 0;
-	this.useStart = false;
-	this.moveDelay = this.fadeDelay = 0;
-	this.removable = false;
-	this.textType = "";
-	this.color = "#fff";
-	this.cachedImage = null;
-	this.update = function (a) {
-		if (this.active) {
-			this.scale += this.scaleSpeed * a;
-			if (this.scaleSpeed > 0) {
-				if (this.scale >= this.maxScale) {
-					this.scale = this.maxScale;
-					this.scaleSpeed *= -1;
-				}
-			} else if (this.scale < this.minScale) {
-				this.scale = this.minScale;
-				this.scaleSpeed = 0;
-			}
-			if (this.moveDelay > 0) {
-				this.moveDelay -= a;
-			} else {
-				this.x += this.xSpeed * a;
-				this.y += this.ySpeed * a;
-			}
-			if (this.fadeDelay > 0) {
-				this.fadeDelay -= a;
-			} else {
-				this.alpha -= this.fadeSpeed * a;
-				if (this.alpha <= 0) {
-					this.alpha = 0;
-					this.active = false;
-				}
-			}
-		}
-	};
-	this.draw = function () {
-		if (this.active) {
-			graph.globalAlpha = this.alpha;
-			if (this.useStart) {
-				if (this.cachedImage != undefined) {
-					graph.drawImage(
-						this.cachedImage,
-						this.x - startX - (this.cachedImage.width / 2) * this.scale,
-						this.y - startY - (this.cachedImage.height / 2) * this.scale,
-						this.cachedImage.width * this.scale,
-						this.cachedImage.height * this.scale,
-					);
-				}
-			} else if (this.cachedImage != undefined) {
-				graph.drawImage(
-					this.cachedImage,
-					this.x - (this.cachedImage.width / 2) * this.scale,
-					this.y - (this.cachedImage.height / 2) * this.scale,
-					this.cachedImage.width * this.scale,
-					this.cachedImage.height * this.scale,
-				);
-			}
-		}
-	};
-}
+
 function updateAnimTexts(a) {
 	graph.lineJoin = "round";
 	graph.textAlign = "center";
 	graph.textBaseline = "middle";
-	for (var b = 0; b < animTexts.length; b++) {
-		animTexts[b].update(a);
-		if (animTexts[b].active) {
-			animTexts[b].draw();
+	for (let i = 0; i < animTexts.length; i++) {
+		animTexts[i].update(a);
+		if (animTexts[i].active) {
+			animTexts[i].draw();
 		}
 	}
 	graph.globalAlpha = 1;
 }
 function getReadyAnimText() {
-	for (var a = 0; a < animTexts.length; ++a) {
-		if (!animTexts[a].active) {
-			return animTexts[a];
+	for (let i = 0; i < animTexts.length; ++i) {
+		if (!animTexts[i].active) {
+			return animTexts[i];
 		}
 	}
 	return null;
@@ -6184,7 +6162,7 @@ function deactiveAllAnimTexts() {
 var cachedTextRenders = [];
 var cachedText = (tmpIndex = null);
 function renderShadedAnimText(a, b, d, e, f) {
-	tmpIndex = a + "" + b + "" + d + "" + f;
+	tmpIndex = `${a}${b}${d}${f}`;
 	cachedText = cachedTextRenders[tmpIndex];
 	if (cachedText == undefined) {
 		var h = document.createElement("canvas");
@@ -6193,18 +6171,18 @@ function renderShadedAnimText(a, b, d, e, f) {
 		g.webkitImageSmoothingEnabled = false;
 		g.mozImageSmoothingEnabled = false;
 		g.textAlign = "center";
-		g.font = f + b + "px mainFont";
+		g.font = `${f + b}px mainFont`;
 		h.width = g.measureText(a).width * 1.08;
 		h.height = b * 1.8 + e;
 		g.fillStyle = shadeColor(d, -18);
-		g.font = f + b + "px mainFont";
+		g.font = `${f + b}px mainFont`;
 		g.textBaseline = "middle";
 		g.textAlign = "center";
 		for (var l = 1; l < e; ++l) {
 			g.fillText(a, h.width / 2, h.height / 2 + l);
 		}
 		g.fillStyle = d;
-		g.font = f + b + "px mainFont";
+		g.font = `${f + b}px mainFont`;
 		g.textBaseline = "middle";
 		g.textAlign = "center";
 		g.fillText(a, h.width / 2, h.height / 2);
@@ -6293,7 +6271,7 @@ function Particle() {
 		if (
 			this.active &&
 			particleSprites[this.spriteIndex] != null &&
-			IsImageOk(particleSprites[this.spriteIndex])
+			isImageOk(particleSprites[this.spriteIndex])
 		) {
 			graph.globalAlpha = this.alpha;
 			if (this.rotation != 0) {
@@ -6320,9 +6298,9 @@ function Particle() {
 		}
 	};
 	this.checkInWall = function () {
-		for (var a = 0; a < gameMap.tiles.length; ++a) {
-			if (gameMap.tiles[a].wall && gameMap.tiles[a].hasCollision) {
-				var tmpTl = gameMap.tiles[a];
+		for (let i = 0; i < gameMap.tiles.length; ++i) {
+			if (gameMap.tiles[i].wall && gameMap.tiles[i].hasCollision) {
+				const tmpTl = gameMap.tiles[i];
 				if (
 					this.x >= tmpTl.x &&
 					this.x <= tmpTl.x + tmpTl.scale &&
@@ -6345,7 +6323,7 @@ function getReadyParticle() {
 var tmpParticle = null;
 function particleCone(a, b, d, e, f, h, g, l, m) {
 	if (showParticles) {
-		for (var k = 0; k < a; ++k) {
+		for (let i = 0; i < a; ++i) {
 			tmpParticle = getReadyParticle();
 			tmpParticle.forceShow = false;
 			tmpParticle.checkCollisions = false;
@@ -6360,7 +6338,7 @@ function particleCone(a, b, d, e, f, h, g, l, m) {
 			tmpParticle.spriteIndex = 0;
 			tmpParticle.maxDuration = -1;
 			tmpParticle.duration = 0;
-			if (k == 0 && l == 2 && m) {
+			if (i === 0 && l === 2 && m) {
 				tmpParticle.spriteIndex = 3;
 				tmpParticle.layer = 0;
 			} else {
@@ -6412,7 +6390,7 @@ function createExplosion(a, b, d) {
 }
 function createSmokePuff(a, b, d, e, f) {
 	createFlash(a, b, d);
-	for (var h = 0; h < 30; ++h) {
+	for (let i = 0; i < 30; ++i) {
 		tmpParticle = getReadyParticle();
 		tmpParticle.dir =
 			mathRound(randomFloat(-mathPI, mathPI) / (mathPI / 3)) * (mathPI / 3);
@@ -6426,7 +6404,7 @@ function createSmokePuff(a, b, d, e, f) {
 		tmpParticle.duration = 0;
 		tmpParticle.layer = 1;
 		tmpParticle.rotation = 0;
-		if (h == 0 && e) {
+		if (i == 0 && e) {
 			tmpParticle.x = a;
 			tmpParticle.y = b;
 			tmpParticle.initScale = randomFloat(50, 60) * d;
@@ -6436,8 +6414,8 @@ function createSmokePuff(a, b, d, e, f) {
 			tmpParticle.checkCollisions = false;
 			tmpParticle.spriteIndex = 6;
 			tmpParticle.layer = 0;
-		} else if (h <= 10) {
-			tmpDist = h * d;
+		} else if (i <= 10) {
+			tmpDist = i * d;
 			tmpParticle.x = a + tmpDist * mathCOS(tmpParticle.dir);
 			tmpParticle.y = b + tmpDist * mathSIN(tmpParticle.dir);
 			tmpParticle.initScale = randomFloat(30, 33) * d;

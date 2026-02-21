@@ -294,24 +294,8 @@ io.on("connection", (socket: Socket) => {
 		player.y += verticalDT * player.speed * delta;
 		player.angle =
 			((player.targetF + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
-		if (player.jumpCountdown > 0) {
-			player.jumpCountdown -= delta;
-		} else if (space === 1) {
+		if (space === 1) {
 			io.emit("jum", player.index);
-			player.jumpDelta -= player.gravityStrength * delta;
-			player.jumpY += player.jumpDelta * delta;
-		}
-		if (player.jumpY !== 0) {
-			player.jumpDelta -= player.gravityStrength * delta;
-			player.jumpY += player.jumpDelta * delta;
-			if (player.jumpY > 0) {
-				player.animIndex = 1;
-			} else {
-				player.jumpY = 0;
-				player.jumpDelta = 0;
-				player.jumpCountdown = 250;
-			}
-			player.jumpY = Math.round(player.jumpY);
 		}
 		wallCol(player, { tiles }, { clutter });
 		player.x = Math.round(player.x);

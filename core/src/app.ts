@@ -2735,7 +2735,7 @@ function updateGameLoop() {
 	oldTime = currentTime;
 	horizontalDT = verticalDT = 0;
 	count++;
-	var a = 0;
+	var doJump = 0;
 	if (keys.u == 1) {
 		verticalDT = -1;
 		temp = 0;
@@ -2755,7 +2755,7 @@ function updateGameLoop() {
 		keyd = 0;
 	}
 	if (keys.s == 1) {
-		a = 1;
+		doJump = 0;
 		temp = 0;
 	}
 	var b = horizontalDT;
@@ -2795,6 +2795,7 @@ function updateGameLoop() {
 					}
 					if (keys.s == 1 && gameObjects[e].jumpCountdown <= 0 && !gameOver) {
 						playerJump(gameObjects[e]);
+						doJump = 1;
 					}
 				}
 				if (gameObjects[e].jumpY != 0) {
@@ -2815,7 +2816,7 @@ function updateGameLoop() {
 						vdt: d,
 						ts: currentTime,
 						isn: inputNumber,
-						s: a,
+						s: doJump,
 					};
 					inputNumber++;
 					sendData.delta = delta;
@@ -2900,7 +2901,7 @@ function updateGameLoop() {
 	}
 	if (disconnected || kicked) {
 		drawOverlay(graph, false, false);
-		a = kicked
+		var a = kicked
 			? reason !== ""
 				? renderShadedAnimText(reason, viewMult * 48, "#ffffff", 6, "")
 				: renderShadedAnimText(

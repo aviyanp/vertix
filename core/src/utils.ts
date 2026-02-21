@@ -1,25 +1,24 @@
-export function setupMap(a, mapTileScale) {
+export function setupMap(a: any, mapTileScale: number) {
 	var b = a.genData;
 	var d = -(mapTileScale * 2);
 	var e = -(mapTileScale * 2);
 	var f = 0;
 	var h = b.height;
-	var g;
 	a.tilePerCol = h;
 	a.width = (b.width - 4) * mapTileScale;
 	a.height = (b.height - 4) * mapTileScale;
 	a.scoreToWin = a.gameMode.score;
 	var l = b.data.data || b.data;
-	for (var m = 0; m < b.width; m++) {
-		for (var k = 0; k < b.height; k++) {
-			var tileDataBaseIdx = (b.width * k + m) << 2;
-			var p =
+	for (let i = 0; i < b.width; i++) {
+		for (let j = 0; j < b.height; j++) {
+			const tileDataBaseIdx = (b.width * j + i) << 2;
+			let p =
 				l[tileDataBaseIdx] +
 				" " +
 				l[tileDataBaseIdx + 1] +
 				" " +
 				l[tileDataBaseIdx + 2];
-			var n = {
+			const n = {
 				index: f,
 				scale: mapTileScale,
 				x: 0,
@@ -40,49 +39,50 @@ export function setupMap(a, mapTileScale) {
 				objTeam: "e",
 				edgeTile: false,
 			};
-			n.x = d + mapTileScale * m;
-			n.y = e + mapTileScale * k;
-			if (m == 0 && k == 0) {
+			n.x = d + mapTileScale * i;
+			n.y = e + mapTileScale * j;
+			if (i === 0 && j === 0) {
 				p = "0 0 0";
 			}
-			if (p == "0 0 0") {
+			let tmpTile: any;
+			if (p === "0 0 0") {
 				n.wall = true;
 				n.hasCollision = true;
-				g = a.tiles[f - h];
-				if (g != undefined) {
-					if (g.wall) {
+				tmpTile = a.tiles[f - h];
+				if (tmpTile !== undefined) {
+					if (tmpTile.wall) {
 						n.left = 1;
 						n.neighbours += 1;
 					}
-					g.right = 1;
-					g.neighbours += 1;
+					tmpTile.right = 1;
+					tmpTile.neighbours += 1;
 				}
-				g = a.tiles[f - h - 1];
-				if (g != undefined && g.wall) {
-					g.spriteIndex = 0;
+				tmpTile = a.tiles[f - h - 1];
+				if (tmpTile?.wall) {
+					tmpTile.spriteIndex = 0;
 				}
-				g = a.tiles[f - h - 1];
-				if (g != undefined && g.wall) {
+				tmpTile = a.tiles[f - h - 1];
+				if (tmpTile?.wall) {
 					n.topLeft = 1;
-					g.bottomRight = 1;
+					tmpTile.bottomRight = 1;
 				}
-				g = a.tiles[f - h + 1];
-				if (g != undefined) {
-					g.topRight = 1;
-					if (g.wall) {
+				tmpTile = a.tiles[f - h + 1];
+				if (tmpTile !== undefined) {
+					tmpTile.topRight = 1;
+					if (tmpTile.wall) {
 						n.bottomLeft = 1;
 					}
 				}
-				g = a.tiles[f - 1];
-				if (g != undefined) {
-					if (g.wall) {
+				tmpTile = a.tiles[f - 1];
+				if (tmpTile !== undefined) {
+					if (tmpTile.wall) {
 						n.top = 1;
 						n.neighbours += 1;
 					}
-					g.bottom = 1;
-					g.neighbours += 1;
+					tmpTile.bottom = 1;
+					tmpTile.neighbours += 1;
 				}
-				if (m <= 0 || k <= 0 || m >= b.width - 1 || k >= b.height - 1) {
+				if (i <= 0 || j <= 0 || i >= b.width - 1 || j >= b.height - 1) {
 					n.left = 1;
 					n.right = 1;
 					n.top = 1;
@@ -90,37 +90,40 @@ export function setupMap(a, mapTileScale) {
 					n.neighbours = 4;
 					n.edgeTile = true;
 				}
-				if (n.spriteIndex == 0 && randomInt(0, 2) == 0) {
+				if (n.spriteIndex === 0 && randomInt(0, 2) === 0) {
 					n.spriteIndex = randomInt(1, 2);
 				}
 			} else {
-				g = randomInt(0, 10);
+				tmpTile = randomInt(0, 10);
 				n.spriteIndex = 0;
-				if (g <= 0) {
+				if (tmpTile <= 0) {
 					n.spriteIndex = 1;
 				}
 				n.wall = false;
-				g = a.tiles[f - h];
-				if (g != undefined && g.wall) {
+				tmpTile = a.tiles[f - h];
+				if (tmpTile?.wall) {
 					n.left = 1;
 					n.neighbours += 1;
 				}
-				g = a.tiles[f - 1];
-				if (g != undefined && g.wall) {
+				tmpTile = a.tiles[f - 1];
+				if (tmpTile?.wall) {
 					n.top = 1;
 					n.neighbours += 1;
 				}
-				g = a.tiles[f - h - 1];
-				if (g != undefined && g.wall) {
+				tmpTile = a.tiles[f - h - 1];
+				if (tmpTile?.wall) {
 					n.topLeft = 1;
 				}
-				if (p == "0 255 0") {
+				if (p === "0 255 0") {
 					n.spriteIndex = 2;
-				} else if (p == "255 255 0") {
-					if (a.gameMode.name == "Hardpoint" || a.gameMode.name == "Zone War") {
+				} else if (p === "255 255 0") {
+					if (
+						a.gameMode.name === "Hardpoint" ||
+						a.gameMode.name === "Zone War"
+					) {
 						n.hardPoint = true;
-						if (a.gameMode.name == "Zone War") {
-							n.objTeam = m < b.width / 2 ? "red" : "blue";
+						if (a.gameMode.name === "Zone War") {
+							n.objTeam = i < b.width / 2 ? "red" : "blue";
 						}
 					} else {
 						n.spriteIndex = 1;
@@ -203,78 +206,77 @@ export function setupMap(a, mapTileScale) {
 }
 function canPlaceFlag(a, b) {
 	if (b) {
-		return a != undefined && !a.wall && !a.hardPoint;
+		return a !== undefined && !a.wall && !a.hardPoint;
 	} else {
-		return a != undefined && !a.hardPoint;
+		return a !== undefined && !a.hardPoint;
 	}
 }
 export function wallCol(a, gameMap, gameObjects) {
-	if (!a.dead) {
-		var b = null;
-		for (var d = (a.nameYOffset = 0); d < gameMap.tiles.length; ++d) {
-			if (gameMap.tiles[d].wall && gameMap.tiles[d].hasCollision) {
-				b = gameMap.tiles[d];
-				if (
-					a.x + a.width / 2 >= b.x &&
-					a.x - a.width / 2 <= b.x + b.scale &&
-					a.y >= b.y &&
-					a.y <= b.y + b.scale
-				) {
-					if (a.oldX <= b.x) {
-						a.x = b.x - a.width / 2 - 2;
-					} else if (a.oldX - a.width / 2 >= b.x + b.scale) {
-						a.x = b.x + b.scale + a.width / 2 + 2;
-					}
-					if (a.oldY <= b.y) {
-						a.y = b.y - 2;
-					} else if (a.oldY >= b.y + b.scale) {
-						a.y = b.y + b.scale + 2;
-					}
+	if (a.dead) return;
+	var b = null;
+	for (var d = (a.nameYOffset = 0); d < gameMap.tiles.length; ++d) {
+		if (gameMap.tiles[d].wall && gameMap.tiles[d].hasCollision) {
+			b = gameMap.tiles[d];
+			if (
+				a.x + a.width / 2 >= b.x &&
+				a.x - a.width / 2 <= b.x + b.scale &&
+				a.y >= b.y &&
+				a.y <= b.y + b.scale
+			) {
+				if (a.oldX <= b.x) {
+					a.x = b.x - a.width / 2 - 2;
+				} else if (a.oldX - a.width / 2 >= b.x + b.scale) {
+					a.x = b.x + b.scale + a.width / 2 + 2;
 				}
-				if (
-					!b.hardPoint &&
-					a.x > b.x &&
-					a.x < b.x + b.scale &&
-					a.y - a.jumpY - a.height * 0.85 > b.y - b.scale / 2 &&
-					a.y - a.jumpY - a.height * 0.85 <= b.y
-				) {
-					a.nameYOffset = Math.round(
-						a.y - a.jumpY - a.height * 0.85 - (b.y - b.scale / 2),
-					);
+				if (a.oldY <= b.y) {
+					a.y = b.y - 2;
+				} else if (a.oldY >= b.y + b.scale) {
+					a.y = b.y + b.scale + 2;
 				}
 			}
-		}
-		for (d = 0; d < gameObjects.length; ++d) {
-			if (gameObjects[d].type == "clutter" && gameObjects[d].active) {
-				b = gameObjects[d];
-				if (
-					b.hc &&
-					//canSee(b.x - startX, b.y - startY, b.w, b.h) &&
-					a.x + a.width / 2 >= b.x &&
-					a.x - a.width / 2 <= b.x + b.w &&
-					a.y >= b.y - b.h * b.tp &&
-					a.y <= b.y
-				) {
-					if (a.oldX + a.width / 2 <= b.x) {
-						a.x = b.x - a.width / 2 - 1;
-					} else if (a.oldX - a.width / 2 >= b.x + b.w) {
-						a.x = b.x + b.w + a.width / 2 + 1;
-					}
-					if (a.oldY >= b.y) {
-						a.y = b.y + 1;
-					} else if (a.oldY <= b.y - b.h * b.tp) {
-						a.y = b.y - b.h * b.tp - 1;
-					}
-				}
+			if (
+				!b.hardPoint &&
+				a.x > b.x &&
+				a.x < b.x + b.scale &&
+				a.y - a.jumpY - a.height * 0.85 > b.y - b.scale / 2 &&
+				a.y - a.jumpY - a.height * 0.85 <= b.y
+			) {
+				a.nameYOffset = Math.round(
+					a.y - a.jumpY - a.height * 0.85 - (b.y - b.scale / 2),
+				);
 			}
 		}
-		b = null;
 	}
+	for (d = 0; d < gameObjects.length; ++d) {
+		if (gameObjects[d].type === "clutter" && gameObjects[d].active) {
+			b = gameObjects[d];
+			if (
+				b.hc &&
+				//canSee(b.x - startX, b.y - startY, b.w, b.h) &&
+				a.x + a.width / 2 >= b.x &&
+				a.x - a.width / 2 <= b.x + b.w &&
+				a.y >= b.y - b.h * b.tp &&
+				a.y <= b.y
+			) {
+				if (a.oldX + a.width / 2 <= b.x) {
+					a.x = b.x - a.width / 2 - 1;
+				} else if (a.oldX - a.width / 2 >= b.x + b.w) {
+					a.x = b.x + b.w + a.width / 2 + 1;
+				}
+				if (a.oldY >= b.y) {
+					a.y = b.y + 1;
+				} else if (a.oldY <= b.y - b.h * b.tp) {
+					a.y = b.y - b.h * b.tp - 1;
+				}
+			}
+		}
+	}
+	b = null;
 }
 export function getCurrentWeapon(player) {
 	if (
-		player.weapons != undefined &&
-		player.weapons[player.currentWeapon] != undefined
+		player.weapons !== undefined &&
+		player.weapons[player.currentWeapon] !== undefined
 	) {
 		return player.weapons[player.currentWeapon];
 	} else {
@@ -285,7 +287,7 @@ export function roundNumber(num: number, fractionDigits: number) {
 	return +num.toFixed(fractionDigits);
 }
 export function getAngleDifference(angleA, angleB) {
-	let anglDif = Math.abs(angleB - angleA) % (Math.PI * 2);
+	const anglDif = Math.abs(angleB - angleA) % (Math.PI * 2);
 	if (anglDif > Math.PI) {
 		return Math.PI * 2 - anglDif;
 	} else {
@@ -299,7 +301,7 @@ export function byteCount(str: string) {
 	return encodeURI(str).split(/%..|./).length - 1;
 }
 export function getDistance(x1: number, y1: number, x2: number, y2: number) {
-	return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+	return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 export function getAngle(x1: number, y1: number, x2: number, y2: number) {
 	return Math.atan2(y2 - y1, x2 - x1);
@@ -308,16 +310,19 @@ export function shadeColor(hexColor: string, percent: number) {
 	var r = parseInt(hexColor.substring(1, 3), 16);
 	var g = parseInt(hexColor.substring(3, 5), 16);
 	var b = parseInt(hexColor.substring(5, 7), 16);
-	var r = (r * (100 + percent)) / 100;
-	var g = (g * (100 + percent)) / 100;
-	var b = (b * (100 + percent)) / 100;
-	var r = r < 255 ? r : 255;
-	var g = g < 255 ? g : 255;
-	var b = b < 255 ? b : 255;
-	var rstr = r.toString(16).length == 1 ? "0" + r.toString(16) : r.toString(16);
-	var gstr = g.toString(16).length == 1 ? "0" + g.toString(16) : g.toString(16);
-	var bstr = b.toString(16).length == 1 ? "0" + b.toString(16) : b.toString(16);
-	return "#" + rstr + gstr + bstr;
+	r = (r * (100 + percent)) / 100;
+	g = (g * (100 + percent)) / 100;
+	b = (b * (100 + percent)) / 100;
+	r = r < 255 ? r : 255;
+	g = g < 255 ? g : 255;
+	b = b < 255 ? b : 255;
+	var rstr =
+		r.toString(16).length === 1 ? `0${r.toString(16)}` : r.toString(16);
+	var gstr =
+		g.toString(16).length === 1 ? `0${g.toString(16)}` : g.toString(16);
+	var bstr =
+		b.toString(16).length === 1 ? `0${b.toString(16)}` : b.toString(16);
+	return `#${rstr}${gstr}${bstr}`;
 }
 export function randomFloat(min: number, max: number) {
 	return min + Math.random() * (max - min);

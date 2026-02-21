@@ -450,11 +450,6 @@ var accStatRank = document.getElementById("accStatRank");
 var accStatView = document.getElementById("accStatView");
 var accStatRankProg = document.getElementById("rankProgress");
 var accStatWorldRank = document.getElementById("accStatWorldRank");
-var clanStats = document.getElementById("clanStats");
-var clanSignUp = document.getElementById("clanSignUp");
-var clanHeader = document.getElementById("clanHeader");
-var leaveClanButton = document.getElementById("leaveClanButton");
-var clanAdminPanel = document.getElementById("clanAdminPanel");
 var profileButton = document.getElementById("profileButton");
 var newUsernameInput = document.getElementById("newUsernameInput");
 var youtubeChannelInput = document.getElementById("youtubeChannelInput");
@@ -483,7 +478,7 @@ function updateAccountPage(a) {
 	};
 	clanAdminPanel.style.display = "none";
 	leaveClanButton.style.display = "none";
-	if (a.clan != "") {
+	if (a.clan !== "") {
 		clanSignUp.style.display = "none";
 		clanStats.style.display = "block";
 		leaveClanButton.style.display = "inline-block";
@@ -583,17 +578,6 @@ var keys = {
 	s: 0,
 	rl: 0,
 };
-var mathABS = Math.abs;
-var mathRound = Math.round;
-var mathFloor = Math.floor;
-var mathSQRT = Math.sqrt;
-var mathPOW = Math.pow;
-var mathMIN = Math.min;
-var mathCOS = Math.cos;
-var mathSIN = Math.sin;
-var mathPI = Math.PI;
-var mathMax = Math.max;
-var mathATAN2 = Math.atan2;
 var reenviar = true;
 var directionLock = false;
 var directions = [];
@@ -617,22 +601,22 @@ function gameInput(a) {
 	a.preventDefault();
 	a.stopPropagation();
 	var b = 0;
-	if (getCurrentWeapon(player) != undefined) {
+	if (getCurrentWeapon(player) !== undefined) {
 		b = getCurrentWeapon(player).yOffset;
 	}
 	mouseX = a.clientX;
 	mouseY = a.clientY;
 	lastAngle = target.f;
 	lastDist = target.d;
-	target.d = mathSQRT(
-		mathPOW(mouseY - (screenHeight / 2 - b / 2), 2) +
-			mathPOW(mouseX - screenWidth / 2, 2),
+	target.d = Math.sqrt(
+		Math.pow(mouseY - (screenHeight / 2 - b / 2), 2) +
+			Math.pow(mouseX - screenWidth / 2, 2),
 	);
-	target.d *= mathMIN(
+	target.d *= Math.min(
 		maxScreenWidth / screenWidth,
 		maxScreenHeight / screenHeight,
 	);
-	target.f = mathATAN2(
+	target.f = Math.atan2(
 		screenHeight / 2 - b / 2 - mouseY,
 		screenWidth / 2 - mouseX,
 	);
@@ -1023,13 +1007,12 @@ function messageFromServer(a) {
 var context = mainCanvas.getContext("2d");
 var osCanvas = document.createElement("canvas");
 var graph = context;
-var mapCanvas = document.getElementById("mapc");
+var mapCanvas: HTMLCanvasElement = document.getElementById("mapc");
 var mapContext = mapCanvas.getContext("2d");
 mapCanvas.width = 200;
 mapCanvas.height = 200;
 mapContext.imageSmoothingEnabled = false;
-mapContext.webkitImageSmoothingEnabled = false;
-mapContext.mozImageSmoothingEnabled = false;
+
 function setCookie(a, b) {
 	if (typeof Storage !== "undefined") {
 		localStorage.setItem(a, b);
@@ -1202,8 +1185,8 @@ if (getCookie("selectChat") == "true") {
 }
 var selectChat = document.getElementById("selectChat").checked;
 settingSelectChat(document.getElementById("selectChat"));
-function settingSelectChat(a) {
-	selectChat = a.checked;
+function settingSelectChat(elem: HTMLElement) {
+	selectChat = elem.checked;
 	setCookie("selectChat", selectChat ? "true" : "false");
 	if (selectChat) {
 		document.getElementById("chatList").style.pointerEvents = "auto";
@@ -1219,40 +1202,40 @@ if (getCookie("targetFPS") != "") {
 	} catch (a) {
 		targetFPS = 30;
 	}
-	var fpsSelect = document.getElementById("fpsSelect");
+	const fpsSelect: HTMLSelectElement = document.getElementById("fpsSelect");
 	fpsSelect.value = targetFPS;
 }
 window.pickedFps = pickedFps;
-function pickedFps(a) {
-	targetFPS = a.options[a.selectedIndex].value;
+function pickedFps(elem: HTMLSelectElement) {
+	targetFPS = elem.options[elem.selectedIndex].value;
 	try {
 		targetFPS *= 1;
-	} catch (b) {
+	} catch (err) {
 		targetFPS = 30;
 	}
 	setCookie("targetFPS", targetFPS);
 }
-function changeMenuTab(a, b) {
-	const e = document.getElementsByClassName("tabcontent");
-	for (let i = 0; i < e.length; i++) {
-		e[i].style.display = "none";
+function changeMenuTab(event: Event, tabId: string) {
+	const tabContents = document.getElementsByClassName("tabcontent");
+	for (let i = 0; i < tabContents.length; i++) {
+		tabContents[i].style.display = "none";
 	}
-	const f = document.getElementsByClassName("tablinks");
-	for (let i = 0; i < e.length; i++) {
-		f[i].className = f[i].className.replace(" active", "");
+	const tabLinks = document.getElementsByClassName("tablinks");
+	for (let i = 0; i < tabContents.length; i++) {
+		tabLinks[i].className = tabLinks[i].className.replace(" active", "");
 	}
-	document.getElementById(b).style.display = "block";
-	a.currentTarget.className += " active";
+	document.getElementById(tabId).style.display = "block";
+	event.currentTarget.className += " active";
 }
-function kickPlayer(a) {
+function kickPlayer(secondReason: string) {
 	if (!disconnected) {
 		hideStatTable();
 		hideUI(true);
 		hideMenuUI();
 		document.getElementById("startMenuWrapper").style.display = "none";
 		gameOver = disconnected = true;
-		if (reason == undefined) {
-			reason = a;
+		if (reason === undefined) {
+			reason = secondReason;
 		}
 		kicked = true;
 		socket.close();
@@ -1398,9 +1381,9 @@ function setupSocket(a: Socket) {
 			setCookie("userName", a.text);
 			loggedIn = true;
 			player.loggedIn = true;
-			var b = findUserByIndex(player.index);
-			if (b) {
-				b.loggedIn = true;
+			const user = findUserByIndex(player.index);
+			if (user) {
+				user.loggedIn = true;
 			}
 		} else {
 			loginMessage.style.display = "block";
@@ -1413,14 +1396,14 @@ function setupSocket(a: Socket) {
 		loginMessage.innerHTML = b;
 		if (d) {
 			document.getElementById("recoverForm").style.display = "block";
-			var e = document.getElementById("chngPassKey");
-			var f = document.getElementById("chngPassPass");
+			const chngPassKey = document.getElementById("chngPassKey");
+			const chngPassPass = document.getElementById("chngPassPass");
 			document.getElementById("chngPassButton").onclick = () => {
 				loginMessage.style.display = "block";
 				loginMessage.innerHTML = "Please Wait...";
 				a.emit("dbCngPass", {
-					passKey: e.value,
-					newPass: f.value,
+					passKey: chngPassKey.value,
+					newPass: chngPassPass.value,
 				});
 				a.on("cngPassRes", (a, b) => {
 					loginMessage.style.display = "block";
@@ -1451,9 +1434,9 @@ function setupSocket(a: Socket) {
 			clanStats.style.display = "block";
 			clanHeader.innerHTML = `[${a}] Clan:`;
 			player.account.clan = a;
-			var b = findUserByIndex(player.index);
-			if (b) {
-				b.account.clan = a;
+			const user = findUserByIndex(player.index);
+			if (user) {
+				user.account.clan = a;
 			}
 			leaveClanButton.style.display = "inline-block";
 			leaveClanButton.innerHTML = "Leave Clan";
@@ -1518,15 +1501,14 @@ function setupSocket(a: Socket) {
 				gameObjects[d].type = "player";
 			}
 			gameMode = gameMap.gameMode;
-			if (a.you.team == "blue") {
+			if (a.you.team === "blue") {
 				document.getElementById("gameModeText").innerHTML = gameMode.desc2;
 			} else {
 				document.getElementById("gameModeText").innerHTML = gameMode.desc1;
 			}
 			currentLikeButton = "";
-			var b = null;
 			for (d = 0; d < gameMap.clutter.length; ++d) {
-				b = gameMap.clutter[d];
+				const b = gameMap.clutter[d];
 				b.type = "clutter";
 				gameObjects.push(b);
 			}
@@ -1580,7 +1562,7 @@ function setupSocket(a: Socket) {
 	});
 	a.on("1", (a) => {
 		var b = findUserByIndex(a.gID);
-		var e = mathABS(a.amount);
+		var e = Math.abs(a.amount);
 		if (
 			(a.dID != player.index || a.gID == player.index) &&
 			a.amount <= 0 &&
@@ -1622,8 +1604,8 @@ function setupSocket(a: Socket) {
 						12,
 						b.x,
 						b.y - b.height / 2 - b.jumpY,
-						e.dir + mathPI,
-						mathPI / randomInt(5, 7),
+						e.dir + Math.PI,
+						Math.PI / randomInt(5, 7),
 						0.5,
 						16,
 						0,
@@ -2160,9 +2142,9 @@ function addRowToStatTable(a, b) {
 }
 function addUser(a) {
 	a = JSON.parse(a);
-	if (a.index != player.index) {
+	if (a.index !== player.index) {
 		a.type = "player";
-		var b = findUserByIndex(a.index);
+		const b = findUserByIndex(a.index);
 		if (b == null) {
 			gameObjects.push(a);
 		} else {
@@ -2171,7 +2153,7 @@ function addUser(a) {
 	}
 }
 function removeUser(a) {
-	if (a != player.index) {
+	if (a !== player.index) {
 		tmpUser = findUserByIndex(a);
 		if (tmpUser != null) {
 			gameObjects.splice(gameObjects.indexOf(tmpUser), 1);
@@ -2203,10 +2185,9 @@ function getItemRarityColor(a) {
 		return "#9d9d9d";
 	}
 }
-let tmpUser;
 function updateUserValue(a) {
 	var b = false;
-	tmpUser = findUserByIndex(a.i);
+	const tmpUser = findUserByIndex(a.i);
 	if (tmpUser != null) {
 		if (a.s != undefined) {
 			tmpUser.score = a.s;
@@ -2281,8 +2262,8 @@ function receiveServerData(a) {
 		}
 		for (d = 0; d < a.length; ) {
 			b = a[0 + d];
-			tmpUser = findUserByIndex(a[1 + d]);
-			if (a[1 + d] == player.index && tmpUser != null) {
+			const tmpUser = findUserByIndex(a[1 + d]);
+			if (a[1 + d] === player.index && tmpUser != null) {
 				if (b > 2) {
 					tmpUser.x = a[2 + d];
 				}
@@ -2298,21 +2279,21 @@ function receiveServerData(a) {
 				tmpUser.onScreen = true;
 			} else if (tmpUser != null) {
 				if (b > 2) {
-					tmpUser.xSpeed = mathABS(tmpUser.x - a[2 + d]);
+					tmpUser.xSpeed = Math.abs(tmpUser.x - a[2 + d]);
 					tmpUser.x = a[2 + d];
 				}
 				if (b > 3) {
-					tmpUser.ySpeed = mathABS(tmpUser.y - a[3 + d]);
+					tmpUser.ySpeed = Math.abs(tmpUser.y - a[3 + d]);
 					tmpUser.y = a[3 + d];
 				}
 				if (b > 4) {
 					tmpUser.angle = a[4 + d];
 				}
-				if (getCurrentWeapon(tmpUser) != undefined) {
-					var e = mathRound((tmpUser.angle % 360) / 90) * 90;
-					if (e == 0 || e == 360) {
+				if (getCurrentWeapon(tmpUser) !== undefined) {
+					const wepAngle = Math.round((tmpUser.angle % 360) / 90) * 90;
+					if (wepAngle === 0 || wepAngle === 360) {
 						getCurrentWeapon(tmpUser).front = true;
-					} else if (e == 180) {
+					} else if (wepAngle === 180) {
 						getCurrentWeapon(tmpUser).front = false;
 					} else {
 						getCurrentWeapon(tmpUser).front = true;
@@ -2342,13 +2323,13 @@ function receiveServerData(a) {
 					} else {
 						a = thisInput[f].hdt;
 						b = thisInput[f].vdt;
-						e = mathSQRT(
+						wepAngle = Math.sqrt(
 							thisInput[f].hdt * thisInput[f].hdt +
 								thisInput[f].vdt * thisInput[f].vdt,
 						);
-						if (e != 0) {
-							a /= e;
-							b /= e;
+						if (wepAngle != 0) {
+							a /= wepAngle;
+							b /= wepAngle;
 						}
 						gameObjects[d].oldX = gameObjects[d].x;
 						gameObjects[d].oldY = gameObjects[d].y;
@@ -2358,8 +2339,8 @@ function receiveServerData(a) {
 						f++;
 					}
 				}
-				gameObjects[d].x = mathRound(gameObjects[d].x);
-				gameObjects[d].y = mathRound(gameObjects[d].y);
+				gameObjects[d].x = Math.round(gameObjects[d].x);
+				gameObjects[d].y = Math.round(gameObjects[d].y);
 				updatePlayerInfo(gameObjects[d]);
 			}
 		}
@@ -2685,7 +2666,7 @@ function updateTeamScores(a, b) {
 					f.style.width = `${b}%`;
 				}
 			} else {
-				b = mathRound((player.score / a) * 100);
+				b = Math.round((player.score / a) * 100);
 				f.setAttribute("style", `display:block;width:${b}%`);
 				f.style.width = `${b}%`;
 				e.innerHTML = "YOU";
@@ -2747,7 +2728,7 @@ function updateGameLoop() {
 	delta = currentTime - oldTime;
 	fpsUpdateUICounter--;
 	if (fpsUpdateUICounter <= 0) {
-		currentFPS = mathRound(1000 / delta);
+		currentFPS = Math.round(1000 / delta);
 		fpsText.innerHTML = `FPS ${currentFPS}`;
 		fpsUpdateUICounter = targetFPS;
 	}
@@ -2779,7 +2760,7 @@ function updateGameLoop() {
 	}
 	var b = horizontalDT;
 	var d = verticalDT;
-	var e = mathSQRT(horizontalDT * horizontalDT + verticalDT * verticalDT);
+	var e = Math.sqrt(horizontalDT * horizontalDT + verticalDT * verticalDT);
 	if (e != 0) {
 		b /= e;
 		d /= e;
@@ -2795,12 +2776,12 @@ function updateGameLoop() {
 						gameObjects[e].y += d * gameObjects[e].speed * delta;
 					}
 					wallCol(gameObjects[e], gameMap, gameObjects);
-					gameObjects[e].x = mathRound(gameObjects[e].x);
-					gameObjects[e].y = mathRound(gameObjects[e].y);
+					gameObjects[e].x = Math.round(gameObjects[e].x);
+					gameObjects[e].y = Math.round(gameObjects[e].y);
 					gameObjects[e].angle =
-						((target.f + mathPI * 2) % (mathPI * 2)) * (180 / mathPI) + 90;
+						((target.f + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
 					if (getCurrentWeapon(gameObjects[e]) != undefined) {
-						var f = mathRound((gameObjects[e].angle % 360) / 90) * 90;
+						var f = Math.round((gameObjects[e].angle % 360) / 90) * 90;
 						if (f == 0 || f == 360) {
 							getCurrentWeapon(gameObjects[e]).front = true;
 						} else if (f == 180) {
@@ -2826,7 +2807,7 @@ function updateGameLoop() {
 						gameObjects[e].jumpDelta = 0;
 						gameObjects[e].jumpCountdown = 250;
 					}
-					gameObjects[e].jumpY = mathRound(gameObjects[e].jumpY);
+					gameObjects[e].jumpY = Math.round(gameObjects[e].jumpY);
 				}
 				if (gameObjects[e].index == player.index && !gameOver) {
 					sendData = {
@@ -2860,9 +2841,9 @@ function updateGameLoop() {
 				if (gameOver) {
 					gameObjects[e].animIndex = 0;
 				} else {
-					f = mathABS(b) + mathABS(d);
+					f = Math.abs(b) + Math.abs(d);
 					if (gameObjects[e].index != player.index) {
-						f = mathABS(gameObjects[e].xSpeed) + mathABS(gameObjects[e].ySpeed);
+						f = Math.abs(gameObjects[e].xSpeed) + Math.abs(gameObjects[e].ySpeed);
 					}
 					if (f > 0) {
 						gameObjects[e].frameCountdown -= delta / 4;
@@ -2994,13 +2975,13 @@ function doGame(a) {
 			player.x -
 			maxScreenWidth / 2 +
 			-screenSkX +
-			target.dOffset * mathCOS(target.f + mathPI);
+			target.dOffset * Math.cos(target.f + Math.PI);
 		startY =
 			player.y -
 			20 -
 			maxScreenHeight / 2 +
 			-screenSkY +
-			target.dOffset * mathSIN(target.f + mathPI);
+			target.dOffset * Math.sin(target.f + Math.PI);
 		if (fillCounter > 1 && socket) {
 			socket.emit("kil");
 		}
@@ -3029,8 +3010,8 @@ function doGame(a) {
 }
 window.addEventListener("resize", resize);
 function resize() {
-	screenWidth = mathRound(window.innerWidth);
-	screenHeight = mathRound(window.innerHeight);
+	screenWidth = Math.round(window.innerWidth);
+	screenHeight = Math.round(window.innerHeight);
 	calculateUIScale();
 	var a = Math.max(
 		screenWidth / maxScreenWidth,
@@ -3146,7 +3127,7 @@ function drawGameLights(a) {
 			tmpObject = bullets[i];
 			if (showGlows && tmpObject.spriteIndex != 2 && tmpObject.active) {
 				tmpBulletGlowWidth =
-					tmpObject.glowWidth || mathMIN(200, tmpObject.width * 14);
+					tmpObject.glowWidth || Math.min(200, tmpObject.width * 14);
 				tmpBulletGlowHeight = tmpObject.glowHeight || tmpObject.height * 2.5;
 				lightX = tmpObject.x - startX;
 				lightY = tmpObject.y - startY;
@@ -3160,7 +3141,7 @@ function drawGameLights(a) {
 						-(tmpBulletGlowHeight / 2) + tmpObject.height / 2,
 						tmpBulletGlowWidth,
 						tmpBulletGlowHeight,
-						tmpObject.dir - mathPI / 2,
+						tmpObject.dir - Math.PI / 2,
 						false,
 						0,
 						0,
@@ -3259,7 +3240,7 @@ function drawMiniMap() {
 				(gameObjects[a].y / gameHeight) * mapScale,
 				pingScale,
 				0,
-				mathPI * 2,
+				Math.PI * 2,
 				true,
 			);
 			mapContext.closePath();
@@ -3282,7 +3263,7 @@ function drawMiniMap() {
 					(gameMap.pickups[a].y / gameHeight) * mapScale,
 					pingScale,
 					0,
-					mathPI * 2,
+					Math.PI * 2,
 					true,
 				);
 				mapContext.closePath();
@@ -3319,8 +3300,8 @@ function screenShake(a, b) {
 }
 function updateScreenShake(a) {
 	if (screenShackeScale > 0) {
-		screenSkX = screenShackeScale * mathCOS(screenSkDir);
-		screenSkY = screenShackeScale * mathSIN(screenSkDir);
+		screenSkX = screenShackeScale * Math.cos(screenSkDir);
+		screenSkY = screenShackeScale * Math.sin(screenSkDir);
 		screenShackeScale *= screenSkRed;
 		if (screenShackeScale <= 0.1) {
 			screenShackeScale = 0;
@@ -3596,7 +3577,7 @@ function playSound(a, b, d) {
 				tmpSound = tmpList[a];
 				if (tmpSound != undefined) {
 					tmpSound = tmpSound.sound;
-					tmpSound.volume(mathRound((1 - tmpDist / maxHearDist) * 10) / 10);
+					tmpSound.volume(Math.round((1 - tmpDist / maxHearDist) * 10) / 10);
 					tmpSound.play();
 				}
 			}
@@ -3704,8 +3685,8 @@ function Projectile() {
 			for (var g = 0; g < this.updateAccuracy; ++g) {
 				var h = this.speed * f;
 				if (this.active) {
-					a = (h * mathCOS(this.dir)) / this.updateAccuracy;
-					b = (h * mathSIN(this.dir)) / this.updateAccuracy;
+					a = (h * Math.cos(this.dir)) / this.updateAccuracy;
+					b = (h * Math.sin(this.dir)) / this.updateAccuracy;
 					if (this.active && !this.skipMove && this.speed > 0) {
 						this.x += a;
 						this.y += b;
@@ -3719,10 +3700,10 @@ function Projectile() {
 					}
 					this.cEndX =
 						this.x +
-						((h + this.height) * mathCOS(this.dir)) / this.updateAccuracy;
+						((h + this.height) * Math.cos(this.dir)) / this.updateAccuracy;
 					this.cEndY =
 						this.y +
-						((h + this.height) * mathSIN(this.dir)) / this.updateAccuracy;
+						((h + this.height) * Math.sin(this.dir)) / this.updateAccuracy;
 					for (h = 0; h < gameObjects.length; ++h) {
 						k = gameObjects[h];
 						if (
@@ -3809,8 +3790,8 @@ function Projectile() {
 													12,
 													k.x,
 													k.y - k.height / 2 - k.jumpY,
-													this.dir + mathPI,
-													mathPI / randomInt(5, 7),
+													this.dir + Math.PI,
+													Math.PI / randomInt(5, 7),
 													0.5,
 													16,
 													0,
@@ -3852,8 +3833,8 @@ function Projectile() {
 	var f = 0;
 	var h = 0;
 	this.canSeeObject = function (a, b) {
-		f = mathABS(this.cEndX - a.x);
-		h = mathABS(this.cEndY - a.y);
+		f = Math.abs(this.cEndX - a.x);
+		h = Math.abs(this.cEndY - a.y);
 		return f <= (b + this.height) * 2 && h <= (b + this.height) * 2;
 	};
 	this.deactivate = function () {
@@ -3865,8 +3846,8 @@ function Projectile() {
 				10,
 				this.cEndX,
 				this.cEndY,
-				this.dir + mathPI,
-				mathPI / randomInt(5, 7),
+				this.dir + Math.PI,
+				Math.PI / randomInt(5, 7),
 				0.5,
 				16,
 				b,
@@ -3875,7 +3856,7 @@ function Projectile() {
 		}
 	};
 	this.bounceDir = function (a) {
-		this.dir = a ? mathPI * 2 - this.dir : mathPI - this.dir;
+		this.dir = a ? Math.PI * 2 - this.dir : Math.PI - this.dir;
 		this.active = true;
 		this.speed *= 0.65;
 		this.x = this.cEndX;
@@ -3902,7 +3883,7 @@ function Projectile() {
 		var m = h;
 		var p = this.cEndY;
 		var q = this.cEndX - g;
-		if (mathABS(q) > 1e-7) {
+		if (Math.abs(q) > 1e-7) {
 			p = (this.cEndY - h) / q;
 			g = h - p * g;
 			m = p * k + g;
@@ -3935,15 +3916,15 @@ function Projectile() {
 			if (this.dotInRect(h, g, a, b, d, e)) {
 				f = 0;
 			} else {
-				h += mathCOS(this.dir + mathPI) * 2;
-				g += mathSIN(this.dir + mathPI) * 2;
+				h += Math.cos(this.dir + Math.PI) * 2;
+				g += Math.sin(this.dir + Math.PI) * 2;
 			}
 		}
 		for (f = 100; f > 0; ) {
 			f--;
 			if (this.dotInRect(h, g, a, b, d, e)) {
-				h += mathCOS(this.dir + mathPI) * 2;
-				g += mathSIN(this.dir + mathPI) * 2;
+				h += Math.cos(this.dir + Math.PI) * 2;
+				g += Math.sin(this.dir + Math.PI) * 2;
 			} else {
 				f = 0;
 			}
@@ -4050,7 +4031,7 @@ function shootNextBullet(a, b) {
 				1 + getCurrentWeapon(b).spread[getCurrentWeapon(b).spreadIndex];
 		}
 		d.trailWidth = d.width * 0.7;
-		d.trailMaxLength = mathRound(d.height * 5);
+		d.trailMaxLength = Math.round(d.height * 5);
 		d.trailAlpha = getCurrentWeapon(b).bTrail;
 		d.weaponIndex = getCurrentWeapon(b).weaponIndex;
 		d.spriteIndex = getCurrentWeapon(b).bSprite;
@@ -4090,11 +4071,11 @@ function shootBullet(a) {
 				getCurrentWeapon(a).spreadIndex = 0;
 			}
 			var d = getCurrentWeapon(a).spread[getCurrentWeapon(a).spreadIndex];
-			var d = utils.roundNumber(target.f + mathPI + d, 2);
+			var d = utils.roundNumber(target.f + Math.PI + d, 2);
 			var e = getCurrentWeapon(a).holdDist + getCurrentWeapon(a).bDist;
-			var f = mathRound(a.x + e * mathCOS(d));
-			var e = mathRound(
-				a.y - getCurrentWeapon(a).yOffset - a.jumpY + e * mathSIN(d),
+			var f = Math.round(a.x + e * Math.cos(d));
+			var e = Math.round(
+				a.y - getCurrentWeapon(a).yOffset - a.jumpY + e * Math.sin(d),
 			);
 			shootNextBullet(
 				{
@@ -4175,7 +4156,7 @@ function updateBullets(a) {
 						-(h.glowHeight / 2) + h.height / 2,
 						h.glowWidth,
 						h.glowHeight,
-						h.dir - mathPI / 2,
+						h.dir - Math.PI / 2,
 						false,
 						0,
 						0,
@@ -4189,7 +4170,7 @@ function updateBullets(a) {
 						0,
 						h.width,
 						h.height + 8,
-						h.dir - mathPI / 2,
+						h.dir - Math.PI / 2,
 						false,
 						0,
 						0,
@@ -4201,10 +4182,10 @@ function updateBullets(a) {
 		}
 		if (showBTrails && h.trailAlpha > 0) {
 			graph.save();
-			b = mathRound(h.startX - startX);
-			d = mathRound(h.startY - startY);
-			e = mathRound(h.x - startX);
-			f = mathRound(h.y - startY);
+			b = Math.round(h.startX - startX);
+			d = Math.round(h.startY - startY);
+			e = Math.round(h.x - startX);
+			f = Math.round(h.y - startY);
 			trailGrad = graph.createLinearGradient(b, d, e, f);
 			trailGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
 			trailGrad.addColorStop(1, `rgba(255, 255, 255, ${h.trailAlpha})`);
@@ -5073,8 +5054,8 @@ var playerContext = playerCanvas.getContext("2d");
 var initPlayerCanv = false;
 function drawGameObjects(a) {
 	if (!initPlayerCanv) {
-		playerCanvas.width = mathRound(300);
-		playerCanvas.height = mathRound(500);
+		playerCanvas.width = Math.round(300);
+		playerCanvas.height = Math.round(500);
 		playerContext.imageSmoothingEnabled = false;
 		playerContext.webkitImageSmoothingEnabled = false;
 		playerContext.mozImageSmoothingEnabled = false;
@@ -5100,8 +5081,8 @@ function drawGameObjects(a) {
 					playerCanvas.width / 2,
 					playerCanvas.height / 2,
 				);
-				var m = (mathPI / 180) * b.angle;
-				var k = mathRound((b.angle % 360) / 90) * 90;
+				var m = (Math.PI / 180) * b.angle;
+				var k = Math.round((b.angle % 360) / 90) * 90;
 				h = b.x - startX;
 				g = b.y - b.jumpY - startY;
 				if (b.animIndex == 1) {
@@ -5376,7 +5357,7 @@ function drawPlayerNames() {
 			(tmpObject.index == player.index || !!tmpObject.onScreen)
 		) {
 			d = tmpObject.height / 3.2;
-			e = mathMIN(200, (tmpObject.maxHealth / 100) * 100);
+			e = Math.min(200, (tmpObject.maxHealth / 100) * 100);
 			shapeX = tmpObject.x - startX;
 			shapeY = tmpObject.y - tmpObject.jumpY - tmpObject.nameYOffset - startY;
 			if (tmpObject.account != undefined && tmpObject.account.hat != null) {
@@ -5648,7 +5629,7 @@ function getCachedFloor(a) {
 			renderSideWalks(e, 1, f, 0, 0, 0, 0, 0);
 		}
 		if (a.topRight == 1) {
-			renderSideWalks(e, 1, f, mathPI, a.scale - f, 0, 0, 0);
+			renderSideWalks(e, 1, f, Math.PI, a.scale - f, 0, 0, 0);
 		}
 		if (a.left == 1) {
 			if (a.top == 1) {
@@ -5665,18 +5646,18 @@ function getCachedFloor(a) {
 					e,
 					tilesPerFloorTile - 2,
 					f,
-					mathPI,
+					Math.PI,
 					a.scale - f,
 					f * 2,
 					0,
 					f,
 				);
 			} else {
-				renderSideWalks(e, tilesPerFloorTile, f, mathPI, a.scale - f, 0, 0, f);
+				renderSideWalks(e, tilesPerFloorTile, f, Math.PI, a.scale - f, 0, 0, f);
 			}
 		}
 		if (a.top == 1) {
-			renderSideWalks(e, tilesPerFloorTile, f, mathPI / 2, 0, 0, f, 0);
+			renderSideWalks(e, tilesPerFloorTile, f, Math.PI / 2, 0, 0, f, 0);
 		}
 		if (a.bottom == 1) {
 			renderSideWalks(e, tilesPerFloorTile, f, 0, 0, a.scale - f, f, 0);
@@ -5742,7 +5723,7 @@ function drawMap(a) {
 						graph,
 						wallSpritesSeg[b.spriteIndex],
 						b.x - startX,
-						b.y + mathRound(mapTileScale / 2) - startY,
+						b.y + Math.round(mapTileScale / 2) - startY,
 						mapTileScale,
 						mapTileScale / 2,
 						0,
@@ -5768,7 +5749,7 @@ function drawMap(a) {
 						graph,
 						tmpTlSprite,
 						b.x - startX,
-						mathRound(b.y - mapTileScale / 2 - startY),
+						Math.round(b.y - mapTileScale / 2 - startY),
 						mapTileScale,
 						mapTileScale,
 						0,
@@ -5821,11 +5802,11 @@ function drawMap(a) {
 var tmpShadow = null;
 function drawSprite(a, b, d, e, f, h, g, l, m, k, p) {
 	if (b != null && b !== undefined && b.width > 0) {
-		d = mathFloor(d);
-		e = mathFloor(e);
-		f = mathFloor(f);
-		h = mathFloor(h);
-		m = mathFloor(m);
+		d = Math.floor(d);
+		e = Math.floor(e);
+		f = Math.floor(f);
+		h = Math.floor(h);
+		m = Math.floor(m);
 		a.rotate(g);
 		a.drawImage(b, d, e, f, h);
 		if (l && showShadows) {
@@ -6249,8 +6230,8 @@ function Particle() {
 				if (this.speed <= 0.01) {
 					this.speed = 0;
 				} else {
-					this.x += this.speed * a * mathCOS(this.dir);
-					this.y += this.speed * a * mathSIN(this.dir);
+					this.x += this.speed * a * Math.cos(this.dir);
+					this.y += this.speed * a * Math.sin(this.dir);
 				}
 				if (this.duration >= this.maxDuration) {
 					this.active = false;
@@ -6394,7 +6375,7 @@ function createSmokePuff(a, b, d, e, f) {
 	for (let i = 0; i < 30; ++i) {
 		tmpParticle = getReadyParticle();
 		tmpParticle.dir =
-			mathRound(randomFloat(-mathPI, mathPI) / (mathPI / 3)) * (mathPI / 3);
+			Math.round(randomFloat(-Math.PI, Math.PI) / (Math.PI / 3)) * (Math.PI / 3);
 		tmpParticle.forceShow = true;
 		tmpParticle.spriteIndex = 2;
 		tmpParticle.checkCollisions = true;
@@ -6417,15 +6398,15 @@ function createSmokePuff(a, b, d, e, f) {
 			tmpParticle.layer = 0;
 		} else if (i <= 10) {
 			tmpDist = i * d;
-			tmpParticle.x = a + tmpDist * mathCOS(tmpParticle.dir);
-			tmpParticle.y = b + tmpDist * mathSIN(tmpParticle.dir);
+			tmpParticle.x = a + tmpDist * Math.cos(tmpParticle.dir);
+			tmpParticle.y = b + tmpDist * Math.sin(tmpParticle.dir);
 			tmpParticle.initScale = randomFloat(30, 33) * d;
 			tmpParticle.initSpeed = (3 / tmpParticle.initScale) * d * f;
 			tmpParticle.maxDuration = maxExplosionDuration * 0.8;
 		} else {
 			tmpDist = randomFloat(0, 10) * d;
-			tmpParticle.x = a + tmpDist * mathCOS(tmpParticle.dir);
-			tmpParticle.y = b + tmpDist * mathSIN(tmpParticle.dir);
+			tmpParticle.x = a + tmpDist * Math.cos(tmpParticle.dir);
+			tmpParticle.y = b + tmpDist * Math.sin(tmpParticle.dir);
 			var g = randomFloat(0.7, 1.4);
 			tmpParticle.initScale = d * 11 * g;
 			tmpParticle.initSpeed = (((12 / tmpParticle.initScale) * d) / g) * f;
@@ -6443,7 +6424,7 @@ function stillDustParticle(a, b, d) {
 	tmpParticle.initSpeed = 0.05;
 	tmpParticle.maxDuration = 600;
 	tmpParticle.duration = 0;
-	tmpParticle.dir = randomFloat(0, mathPI * 2);
+	tmpParticle.dir = randomFloat(0, Math.PI * 2);
 	tmpParticle.rotation = 0;
 	tmpParticle.spriteIndex = 2;
 	tmpParticle.layer = d ? 1 : 0;

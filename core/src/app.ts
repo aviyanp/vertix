@@ -3233,6 +3233,7 @@ function getCachedMiniMap() {
 	return cachedMiniMap;
 }
 function drawMiniMap() {
+	mapContext.reset(); // I had to add this - the minimap 'caching' system seems weird
 	var a = getCachedMiniMap();
 	if (a != null) {
 		mapContext.drawImage(a, 0, 0, mapScale, mapScale);

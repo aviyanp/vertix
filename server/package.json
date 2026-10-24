@@ -5,11 +5,11 @@
 		"dev": "node --watch --watch-preserve-output --import ./import-hooks.ts index.ts"
 	},
 	"dependencies": {
-		"@hono/node-server": "^2.1.1",
+		"@hono/node-server": "^2.1.5",
 		"core": "workspace:*",
-		"hono": "^4.13.8",
-		"sharp": "^0.35.4",
-		"socket.io": "^4.8.3"
+		"hono": "^4.13.13",
+		"sharp": "^0.35.5",
+		"socket.io": "^4.8.4"
 	},
 	"type": "module"
 }

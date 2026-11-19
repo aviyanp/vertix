@@ -279,6 +279,9 @@ export class Game {
 			pl.lastModeVote = undefined;
 			pl.firstReceive = true;
 			pl.likedBy = [];
+			// stale value would show last round's reward as this round's on the
+			// end screen for anyone who earned nothing new
+			pl.lastItem = undefined;
 		}
 
 		// Boss Hunt needs exactly one boss, deterministically assigned to the

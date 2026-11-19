@@ -731,6 +731,7 @@ export class Room {
 				const won =
 					this.game.roundEnd &&
 					this.roundWinner &&
+					player.sessionStartedAt != null &&
 					player.sessionStartedAt <= this.roundEndAt
 						? this.game.mode.teams
 							? player.team === this.roundWinner.team

@@ -14,7 +14,6 @@ import {
 	getUserUnlocks,
 	grantUnlock,
 	hasUnlock,
-	recordSale,
 	spendKr,
 	type UnlockItemType,
 } from "./db.ts";
@@ -124,7 +123,6 @@ export function sellMarketItem(userId: number, type: string, id: number): Market
 	}
 	getDb().transaction(() => {
 		deleteUnlock(userId, type, id);
-		recordSale(userId, type, id);
 		addKr(userId, sellPrice(price));
 	})();
 	return { success: true, kr: getUserStats(userId)?.kr ?? 0 };

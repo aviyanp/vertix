@@ -78,7 +78,7 @@
 				<div class="marketItem">
 					<span
 						class="marketName"
-						style:color={item.type === "spray" ? "#fff" : getItemRarityColor((item as { chance?: number }).chance ?? 0)}
+						style:color={item.type === "spray" ? "#2e3031" : getItemRarityColor((item as { chance?: number }).chance ?? 0)}
 					>
 						{item.name}
 						{#if tip && item.type !== "spray"}

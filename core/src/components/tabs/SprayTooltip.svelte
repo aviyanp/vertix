@@ -11,6 +11,17 @@
 	let anchor: HTMLSpanElement;
 	let pos = $state<{ x: number; y: number } | null>(null);
 
+	// portaled to <body>: the loadout list clips overflow, and .menuCard's
+	// transform makes position:fixed resolve against the card, not the viewport
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				node.remove();
+			},
+		};
+	}
+
 	function show() {
 		const rect = anchor.parentElement?.getBoundingClientRect();
 		if (!rect) return;
@@ -36,7 +47,7 @@
 
 <span bind:this={anchor} style="display:none"></span>
 {#if pos}
-	<div class="hoverTooltip fixedTip" style:left={`${pos.x}px`} style:top={`${pos.y}px`}>
+	<div class="hoverTooltip fixedTip" use:portal style:left={`${pos.x}px`} style:top={`${pos.y}px`}>
 		<img class="sprayDisplayImage" src={`/images/sprays/${props.spray.id}.png`}>
 	</div>
 {/if}
@@ -49,5 +60,6 @@
 	.fixedTip {
 		display: block;
 		position: fixed;
+		pointer-events: none;
 	}
 </style>

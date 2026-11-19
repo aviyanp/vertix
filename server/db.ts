@@ -68,11 +68,11 @@ export function initDb(): void {
 			PRIMARY KEY (user_id, item_type, item_id)
 		);
 
-		CREATE TABLE IF NOT EXISTS player_sold (
+		CREATE TABLE IF NOT EXISTS player_milestone_grants (
 			user_id INTEGER NOT NULL REFERENCES users(id),
 			item_type TEXT NOT NULL,
 			item_id INTEGER NOT NULL,
-			sold_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (user_id, item_type, item_id)
 		);
 
@@ -1313,18 +1313,23 @@ export function deleteUnlock(userId: number, itemType: string, itemId: number): 
 		.run(userId, itemType, itemId);
 }
 
-/** Marks an item as sold so milestone re-grants can't hand it back for free. */
-export function recordSale(userId: number, itemType: string, itemId: number): void {
+/**
+ * Marks a score milestone as resolved for an item — whether the grant itself
+ * happened (unowned) or was skipped (already owned via market/drop). Selling
+ * afterwards never re-arms the milestone, which is what made sale->relog
+ * an infinite KR loop.
+ */
+export function recordMilestoneGrant(userId: number, itemType: string, itemId: number): void {
 	getDb()
 		.prepare(
-			"INSERT OR IGNORE INTO player_sold (user_id, item_type, item_id) VALUES (?, ?, ?)",
+			"INSERT OR IGNORE INTO player_milestone_grants (user_id, item_type, item_id) VALUES (?, ?, ?)",
 		)
 		.run(userId, itemType, itemId);
 }
 
-export function getSoldItems(userId: number): { item_type: UnlockItemType; item_id: number }[] {
+export function getMilestoneGrants(userId: number): { item_type: UnlockItemType; item_id: number }[] {
 	return getDb()
-		.prepare("SELECT item_type, item_id FROM player_sold WHERE user_id = ?")
+		.prepare("SELECT item_type, item_id FROM player_milestone_grants WHERE user_id = ?")
 		.all(userId) as { item_type: UnlockItemType; item_id: number }[];
 }
 

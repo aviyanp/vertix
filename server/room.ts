@@ -231,6 +231,7 @@ export class Room {
 	// who triggered the current round end — remembered through the 15s countdown
 	// so a winner who disconnects before the round-end pass still gets the win
 	private roundWinner: Player | null = null;
+	private roundEndAt = 0;
 	// in-memory per-user round stats for real-time quest progress tracking
 	roundQuestStats = new Map<number, { kills: number; deaths: number; damage: number; healing: number; goals: number; score: number; won: boolean }>();
 	constructor(io: Server, name: string) {
@@ -724,8 +725,13 @@ export class Room {
 				// bank the round before dropping them, otherwise leaving mid-round
 				// throws away every point, kill and quest tick they earned. During
 				// the post-round countdown the win is still creditable — keep it.
+				// sessionStartedAt guards two countdown cases: a player who joined
+				// the winning team after the result was decided, and a rejoiner's
+				// fresh player record (their original leave already banked the win)
 				const won =
-					this.game.roundEnd && this.roundWinner
+					this.game.roundEnd &&
+					this.roundWinner &&
+					player.sessionStartedAt <= this.roundEndAt
 						? this.game.mode.teams
 							? player.team === this.roundWinner.team
 							: player.index === this.roundWinner.index
@@ -1408,6 +1414,7 @@ export class Room {
 		if (lbScore + 1e-7 >= 100 && !this.game.roundEnd) {
 			this.game.roundEnd = true;
 			this.roundWinner = source;
+			this.roundEndAt = Date.now();
 			const winner = this.game.mode.teams ? `team ${source.team}` : source.name;
 			log.info(
 				"round",
@@ -1443,6 +1450,7 @@ export class Room {
 					notifyPresenceChanged();
 					this.persistedThisRound = new WeakSet();
 					this.roundWinner = null;
+					this.roundEndAt = 0;
 					log.info(
 						"round",
 						`${this.name} starting ${this.game.mode.code} (${this.game.mode.name}) — ${this.occupancy()} players`,

@@ -1346,11 +1346,13 @@ export class Room {
 		// keep the in-game rank badge over this player's name in sync for everyone else
 		pl.account.rank = newRank;
 		this.io.emit("upd", { i: pl.index, rnk: newRank });
-		if (newRank > previousRank && authSocket) {
+		if (newRank > previousRank) {
+			// grant crates even when the socket is gone (disconnect path) —
+			// they land in the inventory for the next login
 			for (let r = previousRank + 1; r <= newRank; r++) {
 				grantCrate(userId, "rank_up");
 			}
-			authSocket.emit("rankUp", newRank);
+			if (authSocket) authSocket.emit("rankUp", newRank);
 		}
 
 		// round stats just hit the DB — push the finalized account

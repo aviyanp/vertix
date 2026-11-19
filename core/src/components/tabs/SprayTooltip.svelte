@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import type { sprays } from "../../sprays.ts";
 
 	interface Props {
@@ -6,14 +7,47 @@
 	}
 
 	const props: Props = $props();
+
+	let anchor: HTMLSpanElement;
+	let pos = $state<{ x: number; y: number } | null>(null);
+
+	function show() {
+		const rect = anchor.parentElement?.getBoundingClientRect();
+		if (!rect) return;
+		pos = {
+			x: Math.min(rect.right + 8, window.innerWidth - 110),
+			y: Math.max(4, rect.top + rect.height / 2 - 50),
+		};
+	}
+	function hide() {
+		pos = null;
+	}
+
+	onMount(() => {
+		const parent = anchor.parentElement;
+		parent?.addEventListener("mouseenter", show);
+		parent?.addEventListener("mouseleave", hide);
+		return () => {
+			parent?.removeEventListener("mouseenter", show);
+			parent?.removeEventListener("mouseleave", hide);
+		};
+	});
 </script>
 
-<div class="hoverTooltip">
-	<img class="sprayDisplayImage" src={`/images/sprays/${props.spray.id}.png`}>
-</div>
+<span bind:this={anchor} style="display:none"></span>
+{#if pos}
+	<div class="hoverTooltip fixedTip" style:left={`${pos.x}px`} style:top={`${pos.y}px`}>
+		<img class="sprayDisplayImage" src={`/images/sprays/${props.spray.id}.png`}>
+	</div>
+{/if}
+
 <style>
 	.hoverTooltip {
 		width: 90px;
 		height: 90px;
+	}
+	.fixedTip {
+		display: block;
+		position: fixed;
 	}
 </style>

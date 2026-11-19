@@ -16,6 +16,7 @@
 	import StartMenu from "./StartMenu.svelte";
 	import TouchControls from "./TouchControls.svelte";
 	import ModTab from "./tabs/ModTab.svelte";
+	import MarketTab from "./tabs/MarketTab.svelte";
 	import RewardsTab from "./tabs/RewardsTab.svelte";
 	import SocialHub from "./social/SocialHub.svelte";
 
@@ -126,6 +127,9 @@
 	</Modal>
 	<Modal open={st.menuModal === "mods"} onclose={closeMenuModal}>
 		<div class="menuModalContent"><ModTab /></div>
+	</Modal>
+	<Modal open={st.menuModal === "market"} title="MARKETPLACE" onclose={closeMenuModal}>
+		<div class="menuModalContent menuModalScroll"><MarketTab /></div>
 	</Modal>
 	<Modal open={st.menuModal === "account"} onclose={closeMenuModal} scrollable={false}>
 		<div class="menuModalContent"><AccountWidget /></div>

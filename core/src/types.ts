@@ -174,6 +174,8 @@ export type Account = {
 	hat?: Hat;
 	shirt?: Shirt;
 	pendingCrates?: number;
+	/** KR balance — earned by winning rounds, spent in the marketplace */
+	kr?: number;
 };
 
 export type Spray = {

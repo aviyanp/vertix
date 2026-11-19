@@ -47,8 +47,10 @@ import {
 	getActiveBanFor,
 	getActiveMuteFor,
 	getUserRole,
+	addKr,
 } from "./db.ts";
 import { checkForNewUnlocks, rollPlacementDrop } from "./unlocks.ts";
+import { KR_WIN, marketSprayPrice } from "core/src/market.ts";
 import { isMaintenanceEnabled } from "./server-ops.ts";
 import { trackSessionStart, trackSessionEnd, trackChat } from "./analytics.ts";
 import { incrementQuestProgressFromStats, getQuestProgressSnapshot } from "./quests.ts";
@@ -631,7 +633,9 @@ export class Room {
 			socket.on("cSpray", (id) => {
 				if (!cosmeticRateLimiter(socket.id)) return;
 				const spray = sprays.find((s) => s.id === id);
-				if (spray) {
+				// market-exclusive sprays need the unlock; every other spray is free
+				const needsUnlock = spray && marketSprayPrice(spray.id) !== null;
+				if (spray && (!needsUnlock || (authSocket.userId && hasUnlock(authSocket.userId, "spray", spray.id)))) {
 					player.spray = {
 						src: `/images/sprays/${id}.png`,
 						...spray,
@@ -1352,6 +1356,9 @@ export class Room {
 
 		const stats = getUserStats(userId);
 		const newlyUnlocked = stats ? checkForNewUnlocks(userId, stats.score) : [];
+
+		// winners bank KR — the currency the marketplace spends
+		if (won) addKr(userId, KR_WIN);
 
 		const previousRank = Math.floor(previousScore / 1000);
 		const newRank = stats ? Math.floor(stats.score / 1000) : previousRank;

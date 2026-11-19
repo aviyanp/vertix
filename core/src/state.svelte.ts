@@ -123,6 +123,7 @@ export const st = $state({
 		hat: new Set<number>(),
 		shirt: new Set<number>(),
 		camo: new Set<number>(),
+		spray: new Set<number>(),
 	},
 	unopenedCrateCount: 0,
 	// drives the single shared reward popup mounted in App.svelte
@@ -175,7 +176,8 @@ export const st = $state({
 		| "controls"
 		| "mods"
 		| "bug"
-		| "social",
+		| "social"
+		| "market",
 	/**
 	 * Who is playing right now, pushed over the lobby socket.
 	 *

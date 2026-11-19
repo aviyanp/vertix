@@ -4,6 +4,7 @@
 	import { getItemRarityColor, getUnlockScoreThreshold } from "../../utils.ts";
 	import CosmeticTooltip from "./CosmeticTooltip.svelte";
 	import SprayTooltip from "./SprayTooltip.svelte";
+	import { marketSprayPrice } from "../../market.ts";
 
 	// guests keep today's free-selection behavior (matches the server's bypass
 	// for accounts with no persistent unlocks to check against)
@@ -172,6 +173,7 @@
 				{:else}
 					<span class="lockHint">{getUnlockScoreThreshold(camo.chance).toLocaleString()} score</span>
 				{/if}
+				<CosmeticTooltip type="camo" item={camo} weaponName={st.loadout.class.name} />
 			</div>
 		{/each}
 	</div>
@@ -190,11 +192,10 @@
 				onclick={() => { if (owned) { st.loadout.hat = hat; currentScreen = "main" } }}
 			>
 				{hat.name}
-				{#if owned}
-					<CosmeticTooltip type="hat" item={hat} />
-				{:else}
+				{#if !owned}
 					<span class="lockHint">{getUnlockScoreThreshold(hat.chance).toLocaleString()} score</span>
 				{/if}
+				<CosmeticTooltip type="hat" item={hat} />
 			</div>
 		{/each}
 	</div>
@@ -213,11 +214,10 @@
 				onclick={() => { if (owned) { st.loadout.shirt = shirt; currentScreen = "main" } }}
 			>
 				{shirt.name}
-				{#if owned}
-					<CosmeticTooltip type="shirt" item={shirt} />
-				{:else}
+				{#if !owned}
 					<span class="lockHint">{getUnlockScoreThreshold(shirt.chance).toLocaleString()} score</span>
 				{/if}
+				<CosmeticTooltip type="shirt" item={shirt} />
 			</div>
 		{/each}
 	</div>
@@ -227,8 +227,17 @@
 	<h3 class="menuHeaderTabbed">SELECT SPRAY</h3>
 	<div>
 		{#each st.sprays as spray}
-			<div class="hatSelectItem" onclick={() => {st.loadout.spray = spray; currentScreen = "main"}}>
+			{@const price = marketSprayPrice(spray.id)}
+			{@const owned = price === null || st.unlockedItems.spray.has(spray.id)}
+			<div
+				class="hatSelectItem"
+				class:lockedItem={!owned}
+				onclick={() => { if (owned) { st.loadout.spray = spray; currentScreen = "main" } }}
+			>
 				{spray.name}
+				{#if !owned}
+					<span class="lockHint">{price} KR — MARKET</span>
+				{/if}
 				<SprayTooltip {spray} />
 			</div>
 		{/each}

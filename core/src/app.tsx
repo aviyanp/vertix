@@ -929,10 +929,11 @@ function setupSocket(sock: Socket) {
 			? (data as Camo[][])
 			: [data as Camo[]];
 	});
-	sock.on("updUnlocks", (data: { hat: number[]; shirt: number[]; camo: number[] }) => {
+	sock.on("updUnlocks", (data: { hat: number[]; shirt: number[]; camo: number[]; spray?: number[] }) => {
 		st.unlockedItems.hat = new Set(data.hat);
 		st.unlockedItems.shirt = new Set(data.shirt);
 		st.unlockedItems.camo = new Set(data.camo);
+		st.unlockedItems.spray = new Set(data.spray ?? []);
 	});
 	sock.on("unlockReveal", (items: { name: string; chance: number }[]) => {
 		if (items.length > 0) st.rewardPopup = { kind: "unlocks", items };

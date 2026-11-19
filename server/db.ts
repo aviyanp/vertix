@@ -244,6 +244,11 @@ export function initDb(): void {
 	if (!colNames.includes("role")) {
 		db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'player'");
 	}
+	const statsColumns = db.prepare("PRAGMA table_info(player_stats)").all() as { name: string }[];
+	// KR: the market currency, earned by winning rounds and spent on cosmetics
+	if (!statsColumns.map((c) => c.name).includes("kr")) {
+		db.exec("ALTER TABLE player_stats ADD COLUMN kr INTEGER NOT NULL DEFAULT 0");
+	}
 	const bugColumns = db.prepare("PRAGMA table_info(bug_reports)").all() as { name: string }[];
 	if (!bugColumns.map((c) => c.name).includes("status")) {
 		db.exec("ALTER TABLE bug_reports ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
@@ -411,12 +416,32 @@ export function getUserStats(userId: number) {
 				total_healing: number;
 				total_goals: number;
 				likes: number;
+				kr: number;
 		  }
 		| undefined;
 }
 
 export function createEmptyStats(userId: number): void {
 	getDb().prepare("INSERT INTO player_stats (user_id) VALUES (?)").run(userId);
+}
+
+// --- KR currency ---
+
+/** Credits KR to a user (creates their stats row if needed — new accounts win too). */
+export function addKr(userId: number, amount: number): void {
+	if (!getUserStats(userId)) createEmptyStats(userId);
+	getDb().prepare("UPDATE player_stats SET kr = kr + ? WHERE user_id = ?").run(amount, userId);
+}
+
+/**
+ * Debits KR only if the balance covers it — atomic, so concurrent purchases
+ * can't overspend. Returns true when the debit went through.
+ */
+export function spendKr(userId: number, amount: number): boolean {
+	const res = getDb()
+		.prepare("UPDATE player_stats SET kr = kr - ? WHERE user_id = ? AND kr >= ?")
+		.run(amount, userId, amount);
+	return res.changes > 0;
 }
 
 export function saveRoundStats(
@@ -450,7 +475,7 @@ export function saveRoundStats(
 
 // --- Cosmetics unlock queries ---
 
-export type UnlockItemType = "hat" | "shirt" | "camo";
+export type UnlockItemType = "hat" | "shirt" | "camo" | "spray";
 
 export function hasUnlock(userId: number, itemType: UnlockItemType, itemId: number): boolean {
 	const row = getDb()

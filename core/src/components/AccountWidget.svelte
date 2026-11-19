@@ -194,6 +194,7 @@
 				<div id="rankProgress" style:width={`${st.player.account?.rankPercent ?? 0}%`}></div>
 			</div>
 			<div><b>Rank: </b>{st.player.account?.rank ?? "..."}</div>
+			<div><b>KR: </b><span style="color:#ffd100">{(st.player.account?.kr ?? 0).toLocaleString()}</span></div>
 			<div><b>World Rank: </b>{st.player.account?.worldRank ?? "..."}</div>
 			<div><b>Likes: </b>{st.player.account?.likes ?? "..."}</div>
 			<div><b>Kills: </b>{st.player.account?.kills ?? "..."}</div>

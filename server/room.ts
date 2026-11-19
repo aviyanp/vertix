@@ -1492,9 +1492,14 @@ export class Room {
 					// anyone who joined during the countdown — they didn't finish, so
 					// they bank stats but get no drop
 					for (const pl of this.game.players) {
+						// win credit (incl. the KR payout) requires having actually
+						// finished the round — the same roundEndPlacements gate the
+						// disconnect handler uses. A countdown joiner on the winning
+						// team banks their stats but earns no win.
 						this.persistPlayerRound(
 							pl,
-							isTeamMode ? pl.team === source.team : pl.index === source.index,
+							this.roundEndPlacements.has(pl) &&
+								(isTeamMode ? pl.team === source.team : pl.index === source.index),
 							this.roundEndPlacements.get(pl),
 						);
 					}

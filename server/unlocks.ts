@@ -1,5 +1,5 @@
 import { camos, hats, shirts } from "core/src/skins.ts";
-import { getUserUnlocks, grantUnlock, type UnlockItemType } from "./db.ts";
+import { getSoldItems, getUserUnlocks, grantUnlock, type UnlockItemType } from "./db.ts";
 
 // Sprays have no rarity ("chance") field in their catalog, so the unlock
 // economy only covers hats/shirts/camos — there's no rarity data to hook a
@@ -39,21 +39,24 @@ export type UnlockedItem = { type: DropItemType; id: number; name: string; chanc
  */
 export function checkForNewUnlocks(userId: number, lifetimeScore: number): UnlockedItem[] {
 	const newlyUnlocked: UnlockedItem[] = [];
+	// items the player already sold once must not be re-granted for free —
+	// otherwise sell → relog → re-grant mints infinite KR at sellback price
+	const sold = new Set(getSoldItems(userId).map((s) => `${s.item_type}:${s.item_id}`));
 
 	for (const hat of hats) {
-		if (hat.chance <= 0 || hat.hide) continue;
+		if (hat.chance <= 0 || hat.hide || sold.has(`hat:${hat.id}`)) continue;
 		if (lifetimeScore < thresholdForChance(hat.chance)) continue;
 		if (grantUnlock(userId, "hat", hat.id))
 			newlyUnlocked.push({ type: "hat", id: hat.id, name: hat.name, chance: hat.chance });
 	}
 	for (const shirt of shirts) {
-		if (shirt.chance <= 0 || shirt.hide) continue;
+		if (shirt.chance <= 0 || shirt.hide || sold.has(`shirt:${shirt.id}`)) continue;
 		if (lifetimeScore < thresholdForChance(shirt.chance)) continue;
 		if (grantUnlock(userId, "shirt", shirt.id))
 			newlyUnlocked.push({ type: "shirt", id: shirt.id, name: shirt.name, chance: shirt.chance });
 	}
 	for (const camo of camos) {
-		if (camo.chance <= 0 || camo.hide) continue;
+		if (camo.chance <= 0 || camo.hide || sold.has(`camo:${camo.id}`)) continue;
 		if (lifetimeScore < thresholdForChance(camo.chance)) continue;
 		if (grantUnlock(userId, "camo", camo.id))
 			newlyUnlocked.push({ type: "camo", id: camo.id, name: camo.name, chance: camo.chance });

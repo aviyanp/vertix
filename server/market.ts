@@ -9,10 +9,12 @@ import { sprays } from "core/src/sprays.ts";
 import {
 	addKr,
 	deleteUnlock,
+	getDb,
 	getUserStats,
 	getUserUnlocks,
 	grantUnlock,
 	hasUnlock,
+	recordSale,
 	spendKr,
 	type UnlockItemType,
 } from "./db.ts";
@@ -103,8 +105,14 @@ export function buyMarketItem(userId: number, type: string, id: number): MarketR
 	if (hasUnlock(userId, type as UnlockItemType, id)) {
 		return { success: false, error: "Already owned" };
 	}
-	if (!spendKr(userId, price)) return { success: false, error: "Not enough KR" };
-	grantUnlock(userId, type as UnlockItemType, id);
+	// debit + grant in one transaction: a crash between them must not leave
+	// the KR gone with no cosmetic to show for it
+	const bought = getDb().transaction(() => {
+		if (!spendKr(userId, price)) return false;
+		grantUnlock(userId, type as UnlockItemType, id);
+		return true;
+	})();
+	if (!bought) return { success: false, error: "Not enough KR" };
 	return { success: true, kr: getUserStats(userId)?.kr ?? 0 };
 }
 
@@ -114,7 +122,10 @@ export function sellMarketItem(userId: number, type: string, id: number): Market
 	if (!hasUnlock(userId, type as UnlockItemType, id)) {
 		return { success: false, error: "Not owned" };
 	}
-	deleteUnlock(userId, type, id);
-	addKr(userId, sellPrice(price));
+	getDb().transaction(() => {
+		deleteUnlock(userId, type, id);
+		recordSale(userId, type, id);
+		addKr(userId, sellPrice(price));
+	})();
 	return { success: true, kr: getUserStats(userId)?.kr ?? 0 };
 }

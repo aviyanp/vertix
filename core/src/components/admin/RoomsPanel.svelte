@@ -156,13 +156,13 @@
 							<td>{p.sessionFor ?? "—"}</td>
 							<td class="adminTinyMeta">{p.ip ?? "—"}</td>
 							<td class="adminActionCell">
-									<button type="button" class="adminBtn adminBtnTiny" onclick={() => kick(room.name, room.players.indexOf(p), p.name)}>KICK</button>
-									<button type="button" class="adminBtn adminBtnTiny adminBtnDanger" onclick={() => ban(room.name, room.players.indexOf(p), p.name)}>BAN</button>
-									<button type="button" class="adminBtn adminBtnTiny" onclick={() => mute(room.name, room.players.indexOf(p), p.name)}>MUTE</button>
-									<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/players/${room.name}/${room.players.indexOf(p)}/team`, { team: p.team === "red" ? "blue" : "red" }, undefined)}>TEAM</button>
-									<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/players/${room.name}/${room.players.indexOf(p)}/respawn`, undefined, undefined)}>RESPAWN</button>
-									<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/players/${room.name}/${room.players.indexOf(p)}/boss`, { value: !p.isBoss }, undefined)}>{p.isBoss ? "-BOSS" : "+BOSS"}</button>
-									<button type="button" class="adminBtn adminBtnTiny" onclick={() => adjustScore(room.name, room.players.indexOf(p), p.name)}>SCORE</button>
+									<button type="button" class="adminBtn adminBtnTiny" onclick={() => kick(room.name, p.index, p.name)}>KICK</button>
+									<button type="button" class="adminBtn adminBtnTiny adminBtnDanger" onclick={() => ban(room.name, p.index, p.name)}>BAN</button>
+									<button type="button" class="adminBtn adminBtnTiny" onclick={() => mute(room.name, p.index, p.name)}>MUTE</button>
+									<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/players/${room.name}/${p.index}/team`, { team: p.team === "red" ? "blue" : "red" }, undefined)}>TEAM</button>
+									<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/players/${room.name}/${p.index}/respawn`, undefined, undefined)}>RESPAWN</button>
+									<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/players/${room.name}/${p.index}/boss`, { value: !p.isBoss }, undefined)}>{p.isBoss ? "-BOSS" : "+BOSS"}</button>
+									<button type="button" class="adminBtn adminBtnTiny" onclick={() => adjustScore(room.name, p.index, p.name)}>SCORE</button>
 							</td>
 						</tr>
 					{/each}

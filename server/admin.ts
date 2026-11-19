@@ -156,6 +156,7 @@ function buildOverview() {
 			players: r.game.players.map((p) => {
 				const base = {
 					name: p.name,
+					index: p.index,
 					human: true,
 					team: p.team,
 					score: p.score,
@@ -192,7 +193,7 @@ function bad(c: { json: (body: unknown, status: number) => Response }, message: 
 
 function intParam(value: string | undefined): number | null {
 	const n = Number.parseInt(value ?? "", 10);
-	return Number.isInteger(n) && n > 0 ? n : null;
+	return Number.isInteger(n) && n >= 0 ? n : null;
 }
 
 function requestIp(c: { req: { header: (name: string) => string | undefined } }): string {

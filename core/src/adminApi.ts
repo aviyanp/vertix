@@ -70,6 +70,9 @@ export const adminApi = {
 
 export type AdminPlayer = {
 	name: string;
+	// the server's stable per-room player index — NOT the position in this
+	// array, which drifts as players leave
+	index: number;
 	human: boolean;
 	team: string;
 	score: number;

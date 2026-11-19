@@ -81,6 +81,43 @@ export function getUserUnlockedItems(
 }
 
 /**
+ * Every cosmetic the user doesn't own yet, with `weight` pre-populated from
+ * the catalog's rarity `chance` so a caller can tilt the roll.
+ */
+function unownedDropPool(userId: number): { itemType: UnlockItemType; id: number; name: string; chance: number; weight: number }[] {
+	const owned = new Set(getUserUnlocks(userId).map((u) => `${u.item_type}:${u.item_id}`));
+	const pool: { itemType: UnlockItemType; id: number; name: string; chance: number; weight: number }[] = [];
+	for (const itemType of Object.keys(CATALOGS) as UnlockItemType[]) {
+		for (const item of CATALOGS[itemType]) {
+			if (item.chance <= 0) continue;
+			if (owned.has(`${itemType}:${item.id}`)) continue;
+			pool.push({ itemType, id: item.id, name: item.name, chance: item.chance, weight: item.chance });
+		}
+	}
+	return pool;
+}
+
+/** Weighted pick from the pool, grants the chosen item, returns it (null on empty pool). */
+function rollDropFromPool(
+	userId: number,
+	pool: { itemType: UnlockItemType; id: number; name: string; chance: number; weight: number }[],
+): UnlockedItem | null {
+	if (pool.length === 0) return null;
+	const totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
+	let roll = Math.random() * totalWeight;
+	let chosen = pool[pool.length - 1];
+	for (const item of pool) {
+		roll -= item.weight;
+		if (roll <= 0) {
+			chosen = item;
+			break;
+		}
+	}
+	grantUnlock(userId, chosen.itemType, chosen.id);
+	return { type: chosen.itemType, id: chosen.id, name: chosen.name, chance: chosen.chance };
+}
+
+/**
  * Opens a reward crate: picks a random currently-unowned hat/shirt/camo
  * weighted by its rarity `chance` (not gated by score threshold — that's
  * what makes a crate worth more than the passive unlock system). Returns
@@ -89,28 +126,52 @@ export function getUserUnlockedItems(
 export function openCrateForUser(
 	userId: number,
 ): { itemType: UnlockItemType; itemId: number; itemName: string; chance: number } | null {
-	const owned = new Set(getUserUnlocks(userId).map((u) => `${u.item_type}:${u.item_id}`));
-	const pool: { itemType: UnlockItemType; id: number; name: string; chance: number }[] = [];
-	for (const itemType of Object.keys(CATALOGS) as UnlockItemType[]) {
-		for (const item of CATALOGS[itemType]) {
-			if (item.chance <= 0) continue;
-			if (owned.has(`${itemType}:${item.id}`)) continue;
-			pool.push({ itemType, id: item.id, name: item.name, chance: item.chance });
-		}
-	}
-	if (pool.length === 0) return null;
+	const drop = rollDropFromPool(userId, unownedDropPool(userId));
+	if (!drop) return null;
+	return { itemType: drop.type, itemId: drop.id, itemName: drop.name, chance: drop.chance };
+}
 
-	const totalWeight = pool.reduce((sum, item) => sum + item.chance, 0);
-	let roll = Math.random() * totalWeight;
-	let chosen = pool[pool.length - 1];
+// --- end-of-round placement drops ---------------------------------------------
+//
+// The primary reward path: how you finish on the leaderboard decides both
+// WHETHER you get a drop and how rare it leans — no crate in the middle.
+
+// Chance of any drop at all, by 1-based leaderboard placement (capped at the
+// last row). First place always drops; deeper finishes roll progressively
+// worse odds.
+const DROP_CHANCE = [1, 0.85, 0.65, 0.4, 0.25] as const;
+
+// Per-rarity-tier weight multipliers by placement. A first-place finish tilts
+// the same catalog heavily toward rare pulls without ever making a legendary
+// likely; a bottom finish gets the flat catalog odds.
+const TIER_MULT = [
+	[1, 1, 2, 4, 8], // 1st
+	[1, 1, 1.5, 3, 5], // 2nd
+	[1, 1, 1.2, 2, 3], // 3rd
+	[1, 1, 1, 1.5, 2], // 4th
+	[1, 1, 1, 1.2, 1.5], // 5th+
+] as const;
+
+function tierIndex(chance: number): number {
+	for (let i = 0; i < RARITY_TIERS.length; i++) {
+		if (chance >= RARITY_TIERS[i].minChance) return i;
+	}
+	return RARITY_TIERS.length - 1;
+}
+
+/**
+ * Rolls one end-of-round drop for a leaderboard placement (1 = first place).
+ * Better finishes are likelier to drop at all and lean rarer. Grants the item
+ * directly — returns it for reveal/lastItem wiring, null on a missed roll or
+ * when the user owns everything.
+ */
+export function rollPlacementDrop(userId: number, placement: number): UnlockedItem | null {
+	const row = Math.min(Math.max(placement, 1), DROP_CHANCE.length) - 1;
+	if (Math.random() >= DROP_CHANCE[row]) return null;
+	const mult = TIER_MULT[Math.min(row, TIER_MULT.length - 1)];
+	const pool = unownedDropPool(userId);
 	for (const item of pool) {
-		roll -= item.chance;
-		if (roll <= 0) {
-			chosen = item;
-			break;
-		}
+		item.weight = item.chance * mult[tierIndex(item.chance)];
 	}
-
-	grantUnlock(userId, chosen.itemType, chosen.id);
-	return { itemType: chosen.itemType, itemId: chosen.id, itemName: chosen.name, chance: chosen.chance };
+	return rollDropFromPool(userId, pool);
 }

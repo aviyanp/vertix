@@ -24,7 +24,8 @@ Released under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4
 ### Account & Progression
 - **Account System** — Discord OAuth, or username-only login when Discord is not configured; guests can play without an account
 - **Ranked Progression** — earn score to rank up (every 1,000 score), cosmetic unlocks at score milestones
-- **Crate Reward System** — earn crates on rank up, open them for random cosmetics weighted by rarity
+- **Placement Drops** — at the end of every ranked round each player rolls a cosmetic drop; your leaderboard finish sets both the chance of any drop and how rare it leans (1st place always drops with the best odds). Ranking up also grants a guaranteed boosted drop. No lootbox step in the middle — rewards land straight in your inventory
+- **Crates** — a secondary reward currency from quests, weekly challenges, login streaks and admin grants; opening one rolls a random unowned cosmetic weighted by rarity
 - **127 Hats, 133+ Camos, 70+ Shirts** — each with rarity tiers (Common → Legendary)
 - **83 Sprays** — equippable tags/flags/logos you can spray on walls in-game
 
@@ -32,6 +33,7 @@ Released under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4
 - **Daily Quests** — 3 random quests per day (UTC midnight rotation), earn score or crate rewards
 - **Weekly Challenge** — 1 harder quest per week (Monday UTC rotation), earn crates
 - **Login Streak** — consecutive daily logins build a 7-day streak; day 7 grants +1 crate and the track rolls back to day 1
+- **Round Rewards** — leave early and you bank stats but forfeit the placement drop; staying to the final scoreboard is what pays out
 - **Quest Tracking** — progress tracked from kills, damage, wins, goals, healing per round
 - **Claim Rewards** — click CLAIM on completed quests to receive score bonuses or crates
 
@@ -45,7 +47,7 @@ Released under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4
 - **Main Menu** — three-card layout (Quests, Play, Loadout) with account widget
 - **Room Browser** — filter by mode, search by code, create private rooms
 - **Settings** — graphics toggles, keybind customization, chat options
-- **Reward Popups** — animated crate opening, unlock reveals, rank-up notifications
+- **Reward Popups** — drop reveals, crate opening, rank-up notifications
 - **Social Hub** — in-game tabbed overlay (Profile · Friends · Clans · Leaderboards) with live socket presence, in-place JOIN buttons and actionable clan management; the old standalone social pages redirect into it
 - **Admin Dashboard** — private `/admin` Svelte page: live rooms & player moderation (kick/ban/mute/team/boss), account management, ban & mute lists with audit log, bug-report resolution, server broadcast / maintenance mode / runtime log level, and activity analytics (DAU, mode popularity, concurrency, retention)
 

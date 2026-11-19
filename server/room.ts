@@ -44,12 +44,11 @@ import {
 	findUserClanMembership,
 	getUserStats,
 	hasUnlock,
-	grantCrate,
 	getActiveBanFor,
 	getActiveMuteFor,
 	getUserRole,
 } from "./db.ts";
-import { checkForNewUnlocks } from "./unlocks.ts";
+import { checkForNewUnlocks, rollPlacementDrop } from "./unlocks.ts";
 import { isMaintenanceEnabled } from "./server-ops.ts";
 import { trackSessionStart, trackSessionEnd, trackChat } from "./analytics.ts";
 import { incrementQuestProgressFromStats, getQuestProgressSnapshot } from "./quests.ts";
@@ -1309,9 +1308,9 @@ export class Room {
 	 *
 	 * Private rooms are skipped: the create-room form promises "Statistics will not
 	 * be affected by games played in private rooms", and counting them would let
-	 * anyone farm score and crates in a room with an alt account.
+	 * anyone farm score and drops in a room with an alt account.
 	 */
-	private persistPlayerRound(pl: Player, won: boolean) {
+	private persistPlayerRound(pl: Player, won: boolean, placement?: number) {
 		if (!this.isPermanent) return;
 		if (this.persistedThisRound.has(pl)) return;
 		// pl.userId is set at join; the socket lookup is only a fallback because
@@ -1342,6 +1341,23 @@ export class Room {
 
 		const stats = getUserStats(userId);
 		const newlyUnlocked = stats ? checkForNewUnlocks(userId, stats.score) : [];
+
+		const previousRank = Math.floor(previousScore / 1000);
+		const newRank = stats ? Math.floor(stats.score / 1000) : previousRank;
+
+		// end-of-round placement drop — the headline reward. `placement` is only
+		// set by the round-end pass: leaving mid-round forfeits the drop.
+		if (placement !== undefined) {
+			const drop = rollPlacementDrop(userId, placement);
+			if (drop) newlyUnlocked.push(drop);
+		}
+		// ranking up grants a guaranteed first-place-odds drop directly —
+		// a milestone reward, not a lootbox pull
+		if (newRank > previousRank) {
+			const rankDrop = rollPlacementDrop(userId, 1);
+			if (rankDrop) newlyUnlocked.push(rankDrop);
+		}
+
 		if (newlyUnlocked.length > 0) {
 			if (authSocket) authSocket.emit("unlockReveal", newlyUnlocked);
 			// the end-of-round scoreboard has a "Last Reward" column that always read
@@ -1359,19 +1375,10 @@ export class Room {
 			this.io.emit("upd", { i: pl.index, li: pl.lastItem });
 		}
 
-		const previousRank = Math.floor(previousScore / 1000);
-		const newRank = stats ? Math.floor(stats.score / 1000) : previousRank;
 		// keep the in-game rank badge over this player's name in sync for everyone else
 		pl.account.rank = newRank;
 		this.io.emit("upd", { i: pl.index, rnk: newRank });
-		if (newRank > previousRank) {
-			// grant crates even when the socket is gone (disconnect path) —
-			// they land in the inventory for the next login
-			for (let r = previousRank + 1; r <= newRank; r++) {
-				grantCrate(userId, "rank_up");
-			}
-			if (authSocket) authSocket.emit("rankUp", newRank);
-		}
+		if (newRank > previousRank && authSocket) authSocket.emit("rankUp", newRank);
 
 		// round stats just hit the DB — push the finalized account
 		// stats so the client's profile replaces its live projection
@@ -1440,10 +1447,14 @@ export class Room {
 						(a, b) => b.votes - a.votes,
 					);
 					const isTeamMode = this.game.mode.teams;
+					// final standings decide each player's placement drop odds — the
+					// leaderboard everyone just saw is individual score, teams or not
+					const standings = this.game.players.toSorted((a, b) => b.score - a.score);
 					for (const pl of this.game.players) {
 						this.persistPlayerRound(
 							pl,
 							isTeamMode ? pl.team === source.team : pl.index === source.index,
+							standings.indexOf(pl) + 1,
 						);
 					}
 					this.game.newRound(sorted[0].indx);

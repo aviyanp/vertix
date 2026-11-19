@@ -4,12 +4,22 @@ import {
 	incrementQuestProgress,
 	claimQuest as dbClaimQuest,
 	getLoginStreak,
+	getUserStats,
 	updateLoginStreak,
 	claimStreakReward,
 	incrementBonusScore,
 	grantCrate,
 	type QuestRow,
 } from "./db.ts";
+import { checkForNewUnlocks } from "./unlocks.ts";
+
+// every score grant resolves cosmetic milestones immediately — a milestone
+// left pending gets armed later against items the player already owns,
+// which turns a sell into a free re-grant
+function bumpScoreAndResolveMilestones(userId: number, amount: number) {
+	incrementBonusScore(userId, amount);
+	checkForNewUnlocks(userId, getUserStats(userId)?.score ?? 0);
+}
 
 // --- UTC period helpers ---
 
@@ -217,7 +227,7 @@ export function recordLogin(userId: number): { streakDay: number; justCompletedS
 		grantCrate(userId, "login_streak");
 		justCompleted = true;
 	} else {
-		incrementBonusScore(userId, 50);
+		bumpScoreAndResolveMilestones(userId, 50);
 	}
 
 	return { streakDay: newDay, justCompletedStreak: justCompleted };
@@ -266,7 +276,7 @@ export function claimQuestReward(
 	if (!quest) return { success: false };
 
 	if (quest.reward_type === "score") {
-		incrementBonusScore(userId, quest.reward_amount);
+		bumpScoreAndResolveMilestones(userId, quest.reward_amount);
 	} else if (quest.reward_type === "crate") {
 		for (let i = 0; i < quest.reward_amount; i++) {
 			grantCrate(userId, quest.quest_type === "weekly" ? "quest_weekly" : "quest_daily");

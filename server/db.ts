@@ -270,6 +270,16 @@ export function initDb(): void {
 	if (indexes.length === 0) {
 		db.exec("CREATE UNIQUE INDEX idx_discord_id ON users(discord_id) WHERE discord_id IS NOT NULL");
 	}
+	// the milestone ledger is newer than most inventories: mark every already-
+	// owned cosmetic's milestone resolved so nothing re-grants what was earned
+	// (and possibly sold) before the ledger existed
+	getDb()
+		.prepare(
+			`INSERT OR IGNORE INTO player_milestone_grants (user_id, item_type, item_id)
+			 SELECT user_id, item_type, item_id FROM user_unlocks
+			 WHERE item_type IN ('hat', 'shirt', 'camo')`,
+		)
+		.run();
 }
 
 export function getDb(): Database.Database {

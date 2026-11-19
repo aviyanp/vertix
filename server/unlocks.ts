@@ -1,5 +1,12 @@
 import { camos, hats, shirts } from "core/src/skins.ts";
-import { getMilestoneGrants, getUserUnlocks, grantUnlock, recordMilestoneGrant, type UnlockItemType } from "./db.ts";
+import {
+	getMilestoneGrants,
+	getUserUnlocks,
+	grantUnlock,
+	hasUnlock,
+	recordMilestoneGrant,
+	type UnlockItemType,
+} from "./db.ts";
 
 // Sprays have no rarity ("chance") field in their catalog, so the unlock
 // economy only covers hats/shirts/camos — there's no rarity data to hook a
@@ -53,9 +60,17 @@ export function checkForNewUnlocks(userId: number, lifetimeScore: number): Unloc
 		for (const item of catalog) {
 			if (item.chance <= 0 || item.hide || resolved.has(`${type}:${item.id}`)) continue;
 			if (lifetimeScore < thresholdForChance(item.chance)) continue;
-			recordMilestoneGrant(userId, type, item.id);
-			if (grantUnlock(userId, type, item.id))
+			// already owned via market/drop: the milestone resolves as consumed
+			// with no duplicate. Unowned: resolve only when the grant lands, so
+			// a failed write leaves the milestone pending instead of losing it.
+			if (hasUnlock(userId, type, item.id)) {
+				recordMilestoneGrant(userId, type, item.id);
+				continue;
+			}
+			if (grantUnlock(userId, type, item.id)) {
+				recordMilestoneGrant(userId, type, item.id);
 				newlyUnlocked.push({ type, id: item.id, name: item.name, chance: item.chance });
+			}
 		}
 	}
 

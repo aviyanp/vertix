@@ -1822,6 +1822,10 @@ export class Room {
 
 				setTimeout(() => {
 					if (this.isClosed) return;
+					// a new round rebuilds game.pickups — a timer from the old round
+					// would reactivate a stale object and emit an index that now
+					// points at a different pickup on every client
+					if (!this.game.pickups.includes(pkup)) return;
 					pkup.active = true;
 					this.io.emit("4", pkup, i, 0);
 				}, 15000);

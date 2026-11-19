@@ -1446,9 +1446,15 @@ export class Room {
 			// otherwise change the placement drop odds after the fact. The
 			// score-desc/id-desc tie-break matches the client scoreboard's
 			// sortPlayersByScore so the odds match the place everyone saw.
+			// firstReceive players never spawned this round — the results table
+			// hides them, so they must not rank above actual finishers.
+			// A fresh Map also drops stale entries a restart left behind.
+			const placements = new Map<Player, number>();
 			this.game.players
+				.filter((pl) => !pl.firstReceive)
 				.toSorted((a, b) => b.score - a.score || b.id - a.id)
-				.forEach((pl, i) => this.roundEndPlacements.set(pl, i + 1));
+				.forEach((pl, i) => placements.set(pl, i + 1));
+			this.roundEndPlacements = placements;
 			const winner = this.game.mode.teams ? `team ${source.team}` : source.name;
 			log.info(
 				"round",

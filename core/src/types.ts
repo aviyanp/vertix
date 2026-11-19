@@ -342,6 +342,8 @@ export type ZoneEvent = {
 	score: number;
 	newX?: number;
 	newY?: number;
+	oldX?: number;
+	oldY?: number;
 };
 
 export type LeaderboardData = {

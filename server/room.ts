@@ -1859,7 +1859,13 @@ export class Room {
 				)
 					continue;
 
-				const tprt: ZoneEvent = { indx: player.index, score: ZONE_WAR_POINTS };
+				// oldX/oldY let other clients puff smoke where the scorer vanished
+				const tprt: ZoneEvent = {
+					indx: player.index,
+					score: ZONE_WAR_POINTS,
+					oldX: player.x,
+					oldY: player.y,
+				};
 				const spawn = this.game.getSpawn(player);
 				player.x = tprt.newX = spawn.x;
 				player.y = tprt.newY = spawn.y;

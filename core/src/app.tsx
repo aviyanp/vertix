@@ -1146,7 +1146,6 @@ function setupSocket(sock: Socket) {
 				1.3,
 			);
 		} else {
-			//@ts-expect-error TODO
 			createSmokePuff(zoneEvent.oldX, zoneEvent.oldY, 5, false, 1);
 			showNotification(`${user.name} scored`);
 		}

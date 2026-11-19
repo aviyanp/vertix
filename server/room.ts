@@ -230,9 +230,14 @@ export class Room {
 	// who triggered the current round end — remembered through the 15s countdown
 	// so a winner who disconnects before the round-end pass still gets the win
 	private roundWinner: Player | null = null;
-	// snapshot of who was in the room when the round ended — win credit only
-	// goes to these players (not countdown joiners or rejoiners' fresh records)
-	private roundEndPlayers = new Set<Player>();
+	// snapshot of who was in the room when the round ended, mapped to their
+	// final placement — win credit only goes to these players (not countdown
+	// joiners or rejoiners' fresh records), and the placement decides their
+	// drop odds even if they disconnect during the countdown
+	private roundEndPlacements = new Map<Player, number>();
+	// bumped each time a round ends so a countdown timer orphaned by an admin
+	// restart can't persist the replacement round
+	private roundCount = 0;
 	// in-memory per-user round stats for real-time quest progress tracking
 	roundQuestStats = new Map<number, { kills: number; deaths: number; damage: number; healing: number; goals: number; score: number; won: boolean }>();
 	constructor(io: Server, name: string) {
@@ -729,15 +734,21 @@ export class Room {
 				// roundEndPlayers guards two countdown cases: a player who joined
 				// the winning team after the result was decided, and a rejoiner's
 				// fresh player record (their original leave already banked the win)
-				const won =
+					const won =
 					this.game.roundEnd &&
 					this.roundWinner &&
-					this.roundEndPlayers.has(player)
+					this.roundEndPlacements.has(player)
 						? this.game.mode.teams
 							? player.team === this.roundWinner.team
 							: player.index === this.roundWinner.index
 						: false;
-				this.persistPlayerRound(player, won);
+				// a player who finishes the game and leaves during the countdown still
+				// earned their placement — pass it so they get the drop they placed for
+				this.persistPlayerRound(
+					player,
+					won,
+					this.game.roundEnd ? this.roundEndPlacements.get(player) : undefined,
+				);
 				trackSessionEnd({
 					id: sessionId,
 					userId: authSocket.userId ?? null,
@@ -1352,14 +1363,20 @@ export class Room {
 			if (drop) newlyUnlocked.push(drop);
 		}
 		// ranking up grants a guaranteed first-place-odds drop directly —
-		// a milestone reward, not a lootbox pull
-		if (newRank > previousRank) {
+		// a milestone reward, not a lootbox pull. One per rank crossed, so a
+		// round that jumps several ranks pays every milestone it passed.
+		for (let r = previousRank + 1; r <= newRank; r++) {
 			const rankDrop = rollPlacementDrop(userId, 1);
 			if (rankDrop) newlyUnlocked.push(rankDrop);
 		}
 
 		if (newlyUnlocked.length > 0) {
-			if (authSocket) authSocket.emit("unlockReveal", newlyUnlocked);
+			if (authSocket) {
+				authSocket.emit("unlockReveal", newlyUnlocked);
+				// refresh the client's ownership sets or the drop can't be equipped
+				// until reconnect (the loadout picker gates on updUnlocks)
+				emitUnlocks(authSocket as AuthenticatedSocket);
+			}
 			// the end-of-round scoreboard has a "Last Reward" column that always read
 			// "No Reward" because nothing ever set this. Rarest first, so it shows the
 			// best thing they earned.
@@ -1423,20 +1440,31 @@ export class Room {
 		if (lbScore + 1e-7 >= 100 && !this.game.roundEnd) {
 			this.game.roundEnd = true;
 			this.roundWinner = source;
-			this.roundEndPlayers = new Set(this.game.players);
+			this.roundCount++;
+			// freeze the final standings NOW — scoring continues during the
+			// countdown (hardpoint ticks) and players leave, both of which would
+			// otherwise change the placement drop odds after the fact. The
+			// score-desc/id-desc tie-break matches the client scoreboard's
+			// sortPlayersByScore so the odds match the place everyone saw.
+			this.game.players
+				.toSorted((a, b) => b.score - a.score || b.id - a.id)
+				.forEach((pl, i) => this.roundEndPlacements.set(pl, i + 1));
 			const winner = this.game.mode.teams ? `team ${source.team}` : source.name;
 			log.info(
 				"round",
 				`${this.name} ${this.game.mode.code} won by ${winner} — next round in 15s`,
 			);
 			this.io.emit("7", source.team, this.game.modeVotes, false);
+			const roundAtEnd = this.roundCount;
 			let timeLeft = 15;
 			// Tracked like every other interval this room owns: close() clears
 			// this.intervals, and this one used to be left out entirely, so a room
 			// closed during the countdown kept ticking forever on a dead namespace
 			// and kept the whole Room (map, bullet pool, players) reachable.
 			const timer = setInterval(() => {
-				if (this.isClosed) {
+				// an admin restart resets roundEnd and starts a fresh round — an
+				// orphaned countdown must neither tick nor persist players from it
+				if (this.isClosed || !this.game.roundEnd || this.roundCount !== roundAtEnd) {
 					clearInterval(timer);
 					return;
 				}
@@ -1447,14 +1475,14 @@ export class Room {
 						(a, b) => b.votes - a.votes,
 					);
 					const isTeamMode = this.game.mode.teams;
-					// final standings decide each player's placement drop odds — the
-					// leaderboard everyone just saw is individual score, teams or not
-					const standings = this.game.players.toSorted((a, b) => b.score - a.score);
+					// placement comes from the frozen round-end snapshot: undefined for
+					// anyone who joined during the countdown — they didn't finish, so
+					// they bank stats but get no drop
 					for (const pl of this.game.players) {
 						this.persistPlayerRound(
 							pl,
 							isTeamMode ? pl.team === source.team : pl.index === source.index,
-							standings.indexOf(pl) + 1,
+							this.roundEndPlacements.get(pl),
 						);
 					}
 					this.game.newRound(sorted[0].indx);
@@ -1463,7 +1491,7 @@ export class Room {
 					notifyPresenceChanged();
 					this.persistedThisRound = new WeakSet();
 					this.roundWinner = null;
-					this.roundEndPlayers = new Set();
+					this.roundEndPlacements = new Map();
 					log.info(
 						"round",
 						`${this.name} starting ${this.game.mode.code} (${this.game.mode.name}) — ${this.occupancy()} players`,

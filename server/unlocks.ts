@@ -37,19 +37,19 @@ export function checkForNewUnlocks(userId: number, lifetimeScore: number): Unloc
 	const newlyUnlocked: UnlockedItem[] = [];
 
 	for (const hat of hats) {
-		if (hat.chance <= 0) continue;
+		if (hat.chance <= 0 || hat.hide) continue;
 		if (lifetimeScore < thresholdForChance(hat.chance)) continue;
 		if (grantUnlock(userId, "hat", hat.id))
 			newlyUnlocked.push({ type: "hat", id: hat.id, name: hat.name, chance: hat.chance });
 	}
 	for (const shirt of shirts) {
-		if (shirt.chance <= 0) continue;
+		if (shirt.chance <= 0 || shirt.hide) continue;
 		if (lifetimeScore < thresholdForChance(shirt.chance)) continue;
 		if (grantUnlock(userId, "shirt", shirt.id))
 			newlyUnlocked.push({ type: "shirt", id: shirt.id, name: shirt.name, chance: shirt.chance });
 	}
 	for (const camo of camos) {
-		if (camo.chance <= 0) continue;
+		if (camo.chance <= 0 || camo.hide) continue;
 		if (lifetimeScore < thresholdForChance(camo.chance)) continue;
 		if (grantUnlock(userId, "camo", camo.id))
 			newlyUnlocked.push({ type: "camo", id: camo.id, name: camo.name, chance: camo.chance });
@@ -58,7 +58,10 @@ export function checkForNewUnlocks(userId: number, lifetimeScore: number): Unloc
 	return newlyUnlocked;
 }
 
-const CATALOGS: Record<UnlockItemType, { id: number; name: string; chance: number }[]> = {
+const CATALOGS: Record<
+	UnlockItemType,
+	{ id: number; name: string; chance: number; hide?: boolean }[]
+> = {
 	hat: hats,
 	shirt: shirts,
 	camo: camos,
@@ -89,7 +92,9 @@ function unownedDropPool(userId: number): { itemType: UnlockItemType; id: number
 	const pool: { itemType: UnlockItemType; id: number; name: string; chance: number; weight: number }[] = [];
 	for (const itemType of Object.keys(CATALOGS) as UnlockItemType[]) {
 		for (const item of CATALOGS[itemType]) {
-			if (item.chance <= 0) continue;
+			// hidden items (e.g. Bones) never render in the loadout picker, so
+			// awarding one hands the player a cosmetic they can never equip
+			if (item.chance <= 0 || item.hide) continue;
 			if (owned.has(`${itemType}:${item.id}`)) continue;
 			pool.push({ itemType, id: item.id, name: item.name, chance: item.chance, weight: item.chance });
 		}

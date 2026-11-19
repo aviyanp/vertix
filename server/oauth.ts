@@ -13,7 +13,7 @@ import {
 } from "./db.ts";
 import { checkForNewUnlocks } from "./unlocks.ts";
 import { recordLogin } from "./quests.ts";
-import { createRateLimiter, getClientIp } from "./security.ts";
+import { createRateLimiter, httpClientIp } from "./security.ts";
 import { log } from "./log.ts";
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID ?? "";
@@ -153,10 +153,7 @@ export function createOAuthRoutes(): Hono {
 		if (!localLoginEnabled()) {
 			return c.json({ error: "Local login is disabled" }, 403);
 		}
-		const ip = getClientIp(
-			c.req.header("x-forwarded-for"),
-			c.req.header("x-real-ip"),
-		);
+		const ip = httpClientIp(c);
 		if (!localLoginLimiter(ip)) {
 			return c.json({ error: "Rate limit exceeded" }, 429);
 		}

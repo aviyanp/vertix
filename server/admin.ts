@@ -45,7 +45,7 @@ import {
 	setScore,
 } from "./db.ts";
 import { log, formatDuration, setLogLevel, type LogLevel } from "./log.ts";
-import { createRateLimiter, getClientIp } from "./security.ts";
+import { createRateLimiter, httpClientIp } from "./security.ts";
 import { validateSession } from "./session.ts";
 import { isMaintenanceEnabled, setMaintenance } from "./server-ops.ts";
 import {
@@ -197,7 +197,7 @@ function intParam(value: string | undefined): number | null {
 }
 
 function requestIp(c: { req: { header: (name: string) => string | undefined } }): string {
-	return getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip"));
+	return httpClientIp(c);
 }
 
 function audited(

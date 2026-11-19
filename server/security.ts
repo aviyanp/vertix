@@ -1,3 +1,4 @@
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { PLAYER_SELECTABLE_CLASS_COUNT } from "core/src/loadouts.ts";
 import { camos, hats, shirts } from "core/src/skins.ts";
 import { containsBadWord } from "core/src/badWords.ts";
@@ -247,4 +248,25 @@ export function getClientIp(
 		// trusting a client-supplied value
 	}
 	return socketAddress ?? "unknown";
+}
+
+/**
+ * Client IP for a plain HTTP (Hono) request: the trusted proxy chain when
+ * TRUST_PROXY is set, otherwise the real TCP peer via the server conn info.
+ * The previous call sites passed the `x-real-ip` header as the "socket"
+ * fallback, so a direct deployment resolved every client to "unknown" —
+ * collapsing all of them into one shared rate-limit bucket and one shared
+ * IP-ban subject.
+ */
+export function httpClientIp(c: {
+	req: { header: (name: string) => string | undefined };
+}): string {
+	let remoteAddress: string | undefined;
+	try {
+		remoteAddress = getConnInfo(c as Parameters<typeof getConnInfo>[0]).remote.address;
+	} catch {
+		// no conn info available (e.g. tests driving app.request directly)
+		remoteAddress = undefined;
+	}
+	return getClientIp(c.req.header("x-forwarded-for"), remoteAddress);
 }

@@ -14,6 +14,7 @@ import {
 	createRateLimiter,
 	createConnectionLimiter,
 	getClientIp,
+	httpClientIp,
 	trustsProxy,
 } from "./security.ts";
 import {
@@ -269,7 +270,7 @@ api.route("/", createOAuthRoutes());
 api.route("/admin", createAdminRoutes(io) as unknown as Hono);
 
 api.get("/getIP", (c) => {
-	if (!roomBrowserLimiter(getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip")))) {
+	if (!roomBrowserLimiter(httpClientIp(c))) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 	const roomName = c.req.query("room");
@@ -286,7 +287,7 @@ api.get("/getIP", (c) => {
 });
 
 api.get("/autoJoin", (c) => {
-	if (!roomBrowserLimiter(getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip")))) {
+	if (!roomBrowserLimiter(httpClientIp(c))) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 	const withOne = rooms.find((r) => r.game.players.length === 1 && r.game.players.length < r.game.maxPlayers);
@@ -301,7 +302,7 @@ api.get("/autoJoin", (c) => {
 });
 
 api.post("/createRoom", async (c) => {
-	const clientIp = getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip"));
+	const clientIp = httpClientIp(c);
 	if (!createRoomLimiter(clientIp)) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
@@ -360,7 +361,7 @@ api.get("/health", (c) => {
 });
 
 api.get("/getRooms", (c) => {
-	if (!roomBrowserLimiter(getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip")))) {
+	if (!roomBrowserLimiter(httpClientIp(c))) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 	const list = rooms.map((r) => ({
@@ -391,7 +392,7 @@ function buildLeaderboards() {
 }
 
 api.get("/getLbs", (c) => {
-	if (!leaderboardLimiter(getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip")))) {
+	if (!leaderboardLimiter(httpClientIp(c))) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 	const now = Date.now();
@@ -405,7 +406,7 @@ const FRIENDS_PAGE_SIZE = 50;
 const FRIENDS_MAX_PAGE_SIZE = 100;
 
 api.get("/friends", async (c) => {
-	if (!socialLimiter(getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip")))) {
+	if (!socialLimiter(httpClientIp(c))) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 	// players in rooms right now
@@ -479,7 +480,7 @@ api.get("/friends", async (c) => {
 });
 
 api.get("/clans", (c) => {
-	if (!leaderboardLimiter(getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip")))) {
+	if (!leaderboardLimiter(httpClientIp(c))) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 	// getClanLeaderboard already computes stats for every clan and only slices
@@ -488,7 +489,7 @@ api.get("/clans", (c) => {
 });
 
 api.get("/clan/:name", (c) => {
-	if (!socialLimiter(getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip")))) {
+	if (!socialLimiter(httpClientIp(c))) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 	const clan = findClanByName(c.req.param("name"));
@@ -499,7 +500,7 @@ api.get("/clan/:name", (c) => {
 });
 
 api.get("/profile/:username", (c) => {
-	const clientIp = getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip"));
+	const clientIp = httpClientIp(c);
 	if (!profileLimiter(clientIp)) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
@@ -515,7 +516,7 @@ api.get("/profile/:username", (c) => {
 // rate-limited; the report is stored with the (optional) session username, the
 // room/mode they were in, their user agent and IP for triage.
 api.post("/bugReport", async (c) => {
-	const clientIp = getClientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip"));
+	const clientIp = httpClientIp(c);
 	if (!bugReportLimiter(clientIp)) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}

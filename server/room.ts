@@ -228,6 +228,9 @@ export class Room {
 	// players whose round has already been written to the DB this round, so a
 	// disconnect right before the round-end pass can't double-count them
 	private persistedThisRound = new WeakSet<Player>();
+	// who triggered the current round end — remembered through the 15s countdown
+	// so a winner who disconnects before the round-end pass still gets the win
+	private roundWinner: Player | null = null;
 	// in-memory per-user round stats for real-time quest progress tracking
 	roundQuestStats = new Map<number, { kills: number; deaths: number; damage: number; healing: number; goals: number; score: number; won: boolean }>();
 	constructor(io: Server, name: string) {
@@ -719,8 +722,15 @@ export class Room {
 			});
 			socket.on("disconnect", () => {
 				// bank the round before dropping them, otherwise leaving mid-round
-				// throws away every point, kill and quest tick they earned
-				this.persistPlayerRound(player, false);
+				// throws away every point, kill and quest tick they earned. During
+				// the post-round countdown the win is still creditable — keep it.
+				const won =
+					this.game.roundEnd && this.roundWinner
+						? this.game.mode.teams
+							? player.team === this.roundWinner.team
+							: player.index === this.roundWinner.index
+						: false;
+				this.persistPlayerRound(player, won);
 				trackSessionEnd({
 					id: sessionId,
 					userId: authSocket.userId ?? null,
@@ -1397,6 +1407,7 @@ export class Room {
 		this.game.score.lb = roundNumber(leading, 0);
 		if (lbScore + 1e-7 >= 100 && !this.game.roundEnd) {
 			this.game.roundEnd = true;
+			this.roundWinner = source;
 			const winner = this.game.mode.teams ? `team ${source.team}` : source.name;
 			log.info(
 				"round",
@@ -1431,6 +1442,7 @@ export class Room {
 					// the mode label in the presence list rotates with the round
 					notifyPresenceChanged();
 					this.persistedThisRound = new WeakSet();
+					this.roundWinner = null;
 					log.info(
 						"round",
 						`${this.name} starting ${this.game.mode.code} (${this.game.mode.name}) — ${this.occupancy()} players`,

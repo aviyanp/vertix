@@ -1296,9 +1296,11 @@ export class Room {
 	private persistPlayerRound(pl: Player, won: boolean) {
 		if (!this.isPermanent) return;
 		if (this.persistedThisRound.has(pl)) return;
-		// this.io is a Namespace: `.sockets` is already the id->socket Map
+		// pl.userId is set at join; the socket lookup is only a fallback because
+		// socket.io removes the socket from nsp.sockets before emitting disconnect,
+		// so on that path `io.sockets.get(pl.socketId)` is already undefined.
 		const authSocket = pl.socketId ? this.io.sockets.get(pl.socketId) : null;
-		const userId = (authSocket as AuthenticatedSocket | null | undefined)?.userId;
+		const userId = pl.userId ?? (authSocket as AuthenticatedSocket | null | undefined)?.userId;
 		if (!userId) return;
 		this.persistedThisRound.add(pl);
 

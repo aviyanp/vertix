@@ -1872,6 +1872,10 @@ export class Room {
 					s: player.score,
 					goa: player.totalGoals,
 				});
+				// the player was teleported to spawn — the remaining score-tile
+				// checks would run against the NEW position and could award a
+				// second capture this same tick
+				return;
 			}
 		}
 	}

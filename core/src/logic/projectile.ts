@@ -1,7 +1,7 @@
 import { playSound } from "../sound.ts";
 import { st } from "../state.svelte.ts";
-import type { ClutterObject, Player, Tile } from "../types.ts";
-import { dotInRect, getDistance, randomInt } from "../utils.ts";
+import type { ClutterObject, Player, Tile, TileGrid } from "../types.ts";
+import { collectCollisionTilesAround, dotInRect, getDistance, randomInt } from "../utils.ts";
 import { createLiquid, particleCone, stillDustParticle } from "../visual/particle.ts";
 
 const EXPLOSIVE_CLUTTER_INDEX = 2;
@@ -10,69 +10,6 @@ const BULLET_IMMUNITY_MS = 250;
 const LINE_INTERSECTION_EPSILON = 1e-7;
 const COLLISION_ADJUST_ATTEMPTS = 100;
 const COLLISION_ADJUST_STEP = 2;
-const GRID_CELL_SIZE = 512;
-const GRID_KEY_MULT = 1 << 16;
-
-// assumes tiles don't change during rounds
-function gridKey(cx: number, cy: number) {
-	return cy * GRID_KEY_MULT + cx;
-}
-
-class TileGrid {
-	private cells = new Map<number, Tile[]>();
-	private source: Tile[] | null = null;
-
-	get(tiles: Tile[]) {
-		if (this.source !== tiles) {
-			this.rebuild(tiles);
-			this.source = tiles;
-		}
-		return this.cells;
-	}
-
-	private rebuild(tiles: Tile[]) {
-		this.cells.clear();
-		for (const tl of tiles) {
-			if (!tl.wall || !tl.hasCollision) continue;
-			const cx = Math.floor(tl.x / GRID_CELL_SIZE);
-			const cy = Math.floor(tl.y / GRID_CELL_SIZE);
-			const key = gridKey(cx, cy);
-			let cell = this.cells.get(key);
-			if (!cell) {
-				cell = [];
-				this.cells.set(key, cell);
-			}
-			cell.push(tl);
-		}
-	}
-
-	// Collects tiles in all cells overlapping the segment's AABB into `out`.
-	query(
-		cells: Map<number, Tile[]>,
-		minX: number,
-		minY: number,
-		maxX: number,
-		maxY: number,
-		out: Tile[],
-	) {
-		out.length = 0;
-		const c0x = Math.floor(minX / GRID_CELL_SIZE);
-		const c1x = Math.floor(maxX / GRID_CELL_SIZE);
-		const c0y = Math.floor(minY / GRID_CELL_SIZE);
-		const c1y = Math.floor(maxY / GRID_CELL_SIZE);
-		for (let cy = c0y; cy <= c1y; cy++) {
-			for (let cx = c0x; cx <= c1x; cx++) {
-				const cell = cells.get(gridKey(cx, cy));
-				if (cell) {
-					for (const tl of cell) out.push(tl);
-				}
-			}
-		}
-		return out;
-	}
-}
-
-const sharedTileGrid = new TileGrid();
 
 export class Projectile {
 	width = 0;
@@ -99,11 +36,13 @@ export class Projectile {
 	trailAlpha = 0;
 	owner: Player | null = null;
 	dmg = 0;
+	// client render bookkeeping: whether the bullet was active before this frame's
+	// physics step, so the sprite pass (which runs later) can draw the final frame
+	wasActiveThisFrame = false;
 	hitClutter: number[] = [];
 	hitPlayers: number[] = [];
 	playerImmunity: Record<number, number> = {};
 	serverIndex = 0;
-	shotToken = 0;
 	skipMove = true;
 	startTime = 0;
 	maxLifeTime: number | null = 0;
@@ -113,13 +52,11 @@ export class Projectile {
 	bounce = false;
 	dustTimer = 0;
 	selfDamage = false;
-	private tileGrid = sharedTileGrid;
-	private scratchTiles: Tile[] = [];
 	update(
 		delta: number,
 		currentTime: number,
 		clutter: ClutterObject[],
-		tiles: Tile[],
+		map: { tiles: Tile[]; tileGrid?: TileGrid },
 		players: Player[],
 	) {
 		if (this.active) {
@@ -129,11 +66,10 @@ export class Projectile {
 				this.startTime = currentTime;
 			}
 
-			this.hitClutter = [];
-			this.hitPlayers = [];
+			this.hitClutter.length = 0;
+			this.hitPlayers.length = 0;
 
 			for (let updateStep = 0; updateStep < this.updateAccuracy; ++updateStep) {
-				if (!this.active) break;
 				let vel = this.speed * delta;
 
 				for (const playerIndex in this.playerImmunity) {
@@ -144,26 +80,23 @@ export class Projectile {
 				}
 
 				if (this.active) {
-					const cos = Math.cos(this.dir);
-					const sin = Math.sin(this.dir);
-					let changeX = (vel * cos) / this.updateAccuracy;
-					let changeY = (vel * sin) / this.updateAccuracy;
+					let changeX = (vel * Math.cos(this.dir)) / this.updateAccuracy;
+					let changeY = (vel * Math.sin(this.dir)) / this.updateAccuracy;
 
 					if (this.active && !this.skipMove && this.speed > 0) {
 						this.x += changeX;
 						this.y += changeY;
-						const dx = this.x - this.startX;
-						const dy = this.y - this.startY;
-						if (dx * dx + dy * dy >= this.trailMaxLength * this.trailMaxLength) {
+						if (getDistance(this.startX, this.startY, this.x, this.y) >= this.trailMaxLength) {
 							this.startX += changeX;
 							this.startY += changeY;
 						}
 					}
 
-					this.cEndX = this.x + ((vel + this.height) * cos) / this.updateAccuracy;
-					this.cEndY = this.y + ((vel + this.height) * sin) / this.updateAccuracy;
+					this.cEndX = this.x + ((vel + this.height) * Math.cos(this.dir)) / this.updateAccuracy;
+					this.cEndY = this.y + ((vel + this.height) * Math.sin(this.dir)) / this.updateAccuracy;
 
-					for (const [i, clt] of clutter.entries()) {
+					for (let i = 0; i < clutter.length; i++) {
+						const clt = clutter[i];
 						if (
 							this.active &&
 							clt.active &&
@@ -180,17 +113,12 @@ export class Projectile {
 						}
 					}
 					if (this.active) {
-						const candidates = this.tileGrid.query(
-							this.tileGrid.get(tiles),
-							Math.min(this.x, this.cEndX),
-							Math.min(this.y, this.cEndY),
-							Math.max(this.x, this.cEndX),
-							Math.max(this.y, this.cEndY),
-							this.scratchTiles,
-						);
-						for (const tl of candidates) {
+						// only tiles this sub-step's segment can reach may satisfy lineInRect,
+						// so scan the cells around the segment instead of every tile on the
+						// map - this ran ~576 iterations per sub-step, 3 sub-steps per tick
+						for (const tl of this.tilesNearSegment(map)) {
 							if (this.active) {
-								if (this.canSeeObject(tl, tl.scale)) {
+								if (tl.wall && tl.hasCollision && this.canSeeObject(tl, tl.scale)) {
 									if (tl.bottom) {
 										if (this.lineInRect(tl.x, tl.y, tl.scale, tl.scale, true)) {
 											this.active = false;
@@ -275,7 +203,8 @@ export class Projectile {
 						this.active = false;
 					}
 					if (!this.active && this.explodeOnDeath && !this.collidesWithExplosiveClutter) {
-						for (const [i, clt] of clutter.entries()) {
+						for (let i = 0; i < clutter.length; i++) {
+							const clt = clutter[i];
 							if (
 								clt.active &&
 								clt.hc &&
@@ -304,11 +233,52 @@ export class Projectile {
 		}
 		this.skipMove = false;
 	}
+	/** reused so the per-sub-step tile lookup allocates nothing */
+	private nearbyTiles: Tile[] = [];
+
+	/**
+	 * Colliding wall tiles this sub-step's segment could intersect. The radius comes
+	 * from the segment's own reach (speed x delta, plus the bullet's length), so a
+	 * fast bullet on a long frame still sees every tile in its path. Falls back to
+	 * the full tile list when the map has no grid.
+	 */
+	private tilesNearSegment(map: { tiles: Tile[]; tileGrid?: TileGrid }): Tile[] {
+		const grid = map.tileGrid;
+		if (!grid) return map.tiles;
+		const reach = Math.abs(this.cEndX - this.x) + Math.abs(this.cEndY - this.y) + this.height;
+		const tiles = collectCollisionTilesAround(
+			map,
+			(this.x + this.cEndX) / 2,
+			(this.y + this.cEndY) / 2,
+			this.nearbyTiles,
+			1 + Math.ceil(reach / grid.scale),
+		);
+		if (!tiles) return map.tiles;
+		// Nearest first. The collision loop stops at the first tile that reports a
+		// hit, and this comes back in grid order — so at a corner, where the
+		// segment overlaps two tiles, the bullet could resolve against the further
+		// one and appear to punch through the nearer wall before stopping.
+		const originX = this.x;
+		const originY = this.y;
+		tiles.sort((a, b) => {
+			const ax = a.x + a.scale / 2 - originX;
+			const ay = a.y + a.scale / 2 - originY;
+			const bx = b.x + b.scale / 2 - originX;
+			const by = b.y + b.scale / 2 - originY;
+			return ax * ax + ay * ay - (bx * bx + by * by);
+		});
+		return tiles;
+	}
+
 	activate() {
 		this.skipMove = true;
-		this.hitClutter = [];
-		this.hitPlayers = [];
+		this.hitClutter.length = 0;
+		this.hitPlayers.length = 0;
 		this.playerImmunity = {};
+		// projectiles are a reused pool: this flag is set by handleClutterHit and
+		// must be cleared here, or the slot stays in Room.updateBullet's explosion
+		// branch forever and never applies hitPlayers damage again
+		this.collidesWithExplosiveClutter = false;
 		this.active = true;
 		if (typeof window !== "undefined") playSound(`shot${this.weaponIndex}`, this.x, this.y);
 	}
@@ -320,7 +290,7 @@ export class Projectile {
 	deactivate() {
 		this.active = false;
 	}
-	hitSomething(flipY: boolean, spriteType: number) {
+	hitSomething(flipY: boolean, spriteType: number, bulletHoleLayer = 0) {
 		if (this.spriteIndex !== 2 && typeof window !== "undefined") {
 			particleCone(
 				10,
@@ -332,6 +302,7 @@ export class Projectile {
 				16,
 				spriteType,
 				flipY,
+				bulletHoleLayer,
 			);
 		}
 	}
@@ -349,19 +320,6 @@ export class Projectile {
 		rectHeight: number,
 		shouldAdjustOnCollision: boolean,
 	) {
-		// fast reject: segment AABB vs rect AABB
-		// const segMinX = Math.min(this.x, this.cEndX);
-		// const segMaxX = Math.max(this.x, this.cEndX);
-		// const segMinY = Math.min(this.y, this.cEndY);
-		// const segMaxY = Math.max(this.y, this.cEndY);
-		// if (
-		// 	segMaxX < rectX ||
-		// 	segMinX > rectX + rectWidth ||
-		// 	segMaxY < rectY ||
-		// 	segMinY > rectY + rectHeight
-		// ) {
-		// 	return false;
-		// }
 		let lineStartX = this.x;
 		let lineStartY = this.y;
 		let minX = lineStartX;
@@ -451,6 +409,9 @@ export class Projectile {
 		this.hitSomething(
 			this.cEndX > clt.x && this.cEndX < clt.x + clt.w && this.cEndY > clt.y - clt.h,
 			2,
+			// layer 1 draws after the clutter itself, so the hole marks the barrel
+			// instead of the floor behind it
+			1,
 		);
 	}
 }

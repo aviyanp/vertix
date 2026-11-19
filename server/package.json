@@ -2,14 +2,23 @@
 	"name": "server",
 	"version": "1.0.0",
 	"scripts": {
-		"dev": "node --watch --watch-preserve-output --import ./import-hooks.ts index.ts"
+		"dev": "node --watch --watch-preserve-output --env-file-if-exists=../.env --import ./import-hooks.ts index.ts",
+		"start": "node --import ./import-hooks.ts index.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "node --test --import ./import-hooks.ts \"test/**/*.test.mjs\""
 	},
 	"dependencies": {
-		"@hono/node-server": "^2.1.5",
+		"@hono/node-server": "^2.1.1",
+		"better-sqlite3": "^12.11.1",
 		"core": "workspace:*",
-		"hono": "^4.13.13",
-		"sharp": "^0.35.5",
-		"socket.io": "^4.8.4"
+		"hono": "^4.13.5",
+		"jose": "^6.2.3",
+		"sharp": "^0.35.4",
+		"socket.io": "^4.8.3"
 	},
-	"type": "module"
+	"type": "module",
+	"devDependencies": {
+		"@types/better-sqlite3": "^7.6.13",
+		"typescript": "^5.7.0"
+	}
 }

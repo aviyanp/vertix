@@ -4,16 +4,20 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "vite build",
-		"preview": "vite preview"
+		"preview": "vite preview",
+		"typecheck": "svelte-check --tsconfig ./tsconfig.json",
+		"test": "node --test \"src/**/*.test.mjs\""
 	},
 	"devDependencies": {
-		"@sveltejs/vite-plugin-svelte": "^7.3.1",
-		"@zip.js/zip.js": "^2.24.0",
-		"socket.io-client": "^4.8.4",
-		"vite": "^8.3.5"
+		"@sveltejs/vite-plugin-svelte": "^7.1.2",
+		"@types/howler": "^2.2.13",
+		"@zip.js/zip.js": "^2.8.26",
+		"howler": "^2.2.4",
+		"jsx-dom": "^8.1.6",
+		"socket.io-client": "^4.8.3",
+		"svelte-check": "^4.1.0",
+		"typescript": "^5.7.0",
+		"vite": "^8.0.14"
 	},
-	"type": "module",
-	"dependencies": {
-		"dompurify": "^3.4.17"
-	}
+	"type": "module"
 }

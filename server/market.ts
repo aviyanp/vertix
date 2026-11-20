@@ -185,11 +185,20 @@ export function delistMarketItem(userId: number, type: string, id: number): Mark
  * vanish between page load and click), the buyer is debited, the copy transfers
  * owners, and the seller is credited. Any step failing rolls all of it back.
  */
-export function buyListing(userId: number, type: string, id: number, serial: number): MarketResult {
+export function buyListing(
+	userId: number,
+	type: string,
+	id: number,
+	serial: number,
+	expectedPrice: number,
+): MarketResult {
 	const bought = getDb().transaction(() => {
 		const listing = getListingRow(type, id, serial);
 		if (!listing) return "gone" as const;
 		if (listing.seller_id === userId) return "own" as const;
+		// the seller can delist and relist at a new ask before the click lands —
+		// charge only the price the buyer actually saw
+		if (listing.price !== expectedPrice) return "stale" as const;
 		// one copy per item per account — the PK can't hold two serials of the
 		// same item for a user
 		if (hasUnlock(userId, type as UnlockItemType, id)) return "dup" as const;
@@ -200,6 +209,7 @@ export function buyListing(userId: number, type: string, id: number, serial: num
 	})();
 	if (bought === "gone") return { success: false, error: "Listing gone" };
 	if (bought === "own") return { success: false, error: "That's your listing" };
+	if (bought === "stale") return { success: false, error: "Price changed — refresh" };
 	if (bought === "dup") return { success: false, error: "Already owned" };
 	if (bought === "poor") return { success: false, error: "Not enough KR" };
 	return { success: true, kr: getUserStats(userId)?.kr ?? 0 };

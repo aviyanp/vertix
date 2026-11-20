@@ -575,7 +575,13 @@ api.post("/market/trade", async (c) => {
 					: action === "delist"
 						? delistMarketItem(session.userId, type, id)
 						: action === "buyListing"
-							? buyListing(session.userId, type, id, Math.floor(Number(data?.serial)))
+							? buyListing(
+								session.userId,
+								type,
+								id,
+								Math.floor(Number(data?.serial)),
+								Math.floor(Number(data?.price)),
+							)
 							: { success: false, error: "Bad action" };
 	return c.json(result, result.success ? 200 : 400);
 });

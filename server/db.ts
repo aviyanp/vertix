@@ -275,14 +275,34 @@ export function initDb(): void {
 		// every copy of a cosmetic gets a mint serial, unique within the item,
 		// like printed collectibles — #1 exists exactly once per item
 		db.exec("ALTER TABLE user_unlocks ADD COLUMN serial INTEGER");
-		db.exec(
-			`UPDATE user_unlocks SET serial = (
-				SELECT COUNT(*) FROM user_unlocks o
-				WHERE o.item_type = user_unlocks.item_type
-				  AND o.item_id = user_unlocks.item_id
-				  AND o.rowid <= user_unlocks.rowid
-			)`,
+	}
+	// backfill any row missing a serial — not just on column add, so a crash
+	// mid-migration can't leave NULLs that listings can't match on
+	const unserialled = db
+		.prepare(
+			"SELECT rowid, item_type, item_id FROM user_unlocks WHERE serial IS NULL ORDER BY item_type, item_id, rowid",
+		)
+		.all() as { rowid: number; item_type: string; item_id: number }[];
+	if (unserialled.length) {
+		const maxStmt = db.prepare(
+			"SELECT MAX(serial) AS m FROM user_unlocks WHERE item_type = ? AND item_id = ?",
 		);
+		const setStmt = db.prepare("UPDATE user_unlocks SET serial = ? WHERE rowid = ?");
+		const next = new Map<string, number>();
+		db.transaction(() => {
+			for (const r of unserialled) {
+				const key = `${r.item_type}:${r.item_id}`;
+				if (!next.has(key)) {
+					next.set(
+						key,
+						(maxStmt.get(r.item_type, r.item_id) as { m: number | null }).m ?? 0,
+					);
+				}
+				const serial = (next.get(key) ?? 0) + 1;
+				setStmt.run(serial, r.rowid);
+				next.set(key, serial);
+			}
+		})();
 	}
 	if (!unlockColumns.map((c) => c.name).includes("listed_price")) {
 		db.exec("ALTER TABLE user_unlocks ADD COLUMN listed_price INTEGER");

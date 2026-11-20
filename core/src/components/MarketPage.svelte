@@ -198,7 +198,7 @@
 											<td>
 												{#if signedIn}
 													<button class="btn small" disabled={busy}
-														onclick={() => trade({ action: "buyListing", type: l.type, id: l.id, serial: l.serial }, `Bought ${it.name} #${l.serial}`)}>BUY</button>
+														onclick={() => trade({ action: "buyListing", type: l.type, id: l.id, serial: l.serial, price: l.price }, `Bought ${it.name} #${l.serial}`)}>BUY</button>
 												{/if}
 											</td>
 										</tr>
@@ -216,7 +216,8 @@
 </div>
 
 <style>
-	.page { max-width: 1100px; margin: 0 auto; padding: 16px; color: #e8e8e8; font-family: "mainFont"; }
+	/* main.css pins body overflow — the page scrolls in its own container */
+	.page { max-width: 1100px; height: 100vh; overflow-y: auto; margin: 0 auto; padding: 16px; color: #e8e8e8; font-family: "mainFont"; }
 	.topbar { display: flex; align-items: baseline; gap: 16px; }
 	.brand { color: #9fd; text-decoration: none; }
 	h1 { font-size: 22px; letter-spacing: 2px; flex: 1; margin: 0; }

@@ -165,12 +165,18 @@ port `1119` is dev-only). No `.env`, network, or permission setup needed:
   volume — sessions stay valid across restarts.
 - Drop texture mod packs in `./data/mods/` on the host to serve them.
 
-**Migrating an existing `./data/vertix.db`** (from the old bind-mounted setup):
+**Migrating an existing `./data/vertix.db`** (from the old bind-mounted setup).
+Stop the old server first so SQLite checkpoints the write-ahead log into the
+main file, then copy all three files:
 
 ```bash
-docker compose up -d --build          # creates the volume
+docker compose down                   # clean close flushes the WAL into vertix.db
+docker compose up -d --build          # creates the vertix-data volume
+docker compose stop server
 docker compose cp data/vertix.db server:/app/data/vertix.db
-docker compose restart server
+docker compose cp data/vertix.db-wal server:/app/data/vertix.db-wal   # if present
+docker compose cp data/vertix.db-shm server:/app/data/vertix.db-shm   # if present
+docker compose start server
 ```
 
 ### Optional configuration

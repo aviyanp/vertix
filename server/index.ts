@@ -719,33 +719,33 @@ if (process.env.NODE_ENV === "production") {
 
 	// The whole dist tree is small — memoize file contents instead of hitting
 	// disk (existsSync + statSync + readFileSync) on every request.
-	const fileCache = new Map<string, { body: Buffer; type: string; cache: string } | null>();
+	const fileCache = new Map<string, { body: Buffer; type: string; cache: string }>();
 	const resolveAsset = (urlPath: string) => {
-		let cached = fileCache.get(urlPath);
-		if (cached === undefined) {
-			cached = null;
-			let filePath = path.join(distDir, urlPath === "/" ? "index.html" : urlPath);
-			// Extensionless paths map to their .html file when one exists — /admin is
-			// built as admin.html, and the old explicit /admin route served it without
-			// the suffix, so shared links keep working.
-			if (!path.extname(filePath) && fs.existsSync(filePath + ".html")) {
-				filePath += ".html";
-			}
-			// containment check: never serve a file resolved outside distDir
-			const inDist = path.resolve(filePath).startsWith(path.resolve(distDir) + path.sep);
-			if (inDist && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-				const ext = path.extname(filePath);
-				cached = {
-					body: fs.readFileSync(filePath),
-					type: MIME[ext] || "application/octet-stream",
-					// Vite emits content-hashed names under /assets — cache forever.
-					// Everything else (index.html, favicons) revalidates quickly.
-					cache: urlPath.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
-				};
-			}
-			fileCache.set(urlPath, cached);
+		const hit = fileCache.get(urlPath);
+		if (hit) return hit;
+		// Misses are NOT cached — every unique URL would otherwise grow this map
+		// without bound (memory exhaustion via random pathnames). Only real files
+		// are memoized, which bounds the cache to the number of dist entries.
+		let filePath = path.join(distDir, urlPath === "/" ? "index.html" : urlPath);
+		// Extensionless paths map to their .html file when one exists — /admin is
+		// built as admin.html, and the old explicit /admin route served it without
+		// the suffix, so shared links keep working.
+		if (!path.extname(filePath) && fs.existsSync(filePath + ".html")) {
+			filePath += ".html";
 		}
-		return cached;
+		// containment check: never serve a file resolved outside distDir
+		const inDist = path.resolve(filePath).startsWith(path.resolve(distDir) + path.sep);
+		if (!inDist || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return null;
+		const ext = path.extname(filePath);
+		const asset = {
+			body: fs.readFileSync(filePath),
+			type: MIME[ext] || "application/octet-stream",
+			// Vite emits content-hashed names under /assets — cache forever.
+			// Everything else (index.html, favicons) revalidates quickly.
+			cache: urlPath.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
+		};
+		fileCache.set(urlPath, asset);
+		return asset;
 	};
 	const indexBody = fs.readFileSync(path.join(distDir, "index.html"));
 

@@ -36,7 +36,8 @@ volumes:
   vertix-data:
 
 networks:
-  # Compose-managed (not external): `docker compose up -d` works with zero
-  # pre-steps, and an nginx/npm proxy can still join vertix-net to reach
-  # http://server:1118.
+  # `docker compose up -d` creates it if absent (no pre-step needed), and the
+  # fixed name keeps the documented proxy upstream `server:1118` working for
+  # nginx/npm instances already attached to vertix-net.
   vertix-net:
+    name: vertix-net

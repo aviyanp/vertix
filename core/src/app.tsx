@@ -929,13 +929,29 @@ function setupSocket(sock: Socket) {
 			? (data as Camo[][])
 			: [data as Camo[]];
 	});
-	sock.on("updUnlocks", (data: { hat: number[]; shirt: number[]; camo: number[]; spray?: number[] }) => {
-		st.unlockedItems.hat = new Set(data.hat);
-		st.unlockedItems.shirt = new Set(data.shirt);
-		st.unlockedItems.camo = new Set(data.camo);
-		st.unlockedItems.spray = new Set(data.spray ?? []);
-	});
-	sock.on("unlockReveal", (items: { name: string; chance: number }[]) => {
+	sock.on(
+		"updUnlocks",
+		(
+			data: {
+				hat: { id: number; serial: number }[];
+				shirt: { id: number; serial: number }[];
+				camo: { id: number; serial: number }[];
+				spray?: { id: number; serial: number }[];
+			},
+		) => {
+			const serials = new Map<string, number>();
+			const apply = (t: "hat" | "shirt" | "camo" | "spray", rows: { id: number; serial: number }[]) => {
+				st.unlockedItems[t] = new Set(rows.map((r) => r.id));
+				for (const r of rows) serials.set(`${t}:${r.id}`, r.serial);
+			};
+			apply("hat", data.hat ?? []);
+			apply("shirt", data.shirt ?? []);
+			apply("camo", data.camo ?? []);
+			apply("spray", data.spray ?? []);
+			st.unlockSerials = serials;
+		},
+	);
+	sock.on("unlockReveal", (items: { name: string; chance: number; serial?: number }[]) => {
 		if (items.length > 0) st.rewardPopup = { kind: "unlocks", items };
 	});
 	sock.on("rankUp", (rank: number) => {

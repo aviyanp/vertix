@@ -54,7 +54,7 @@
 	<button type="button" class="menuRowButton" onclick={() => st.menuModal = "settings"}>SETTINGS</button>
 	<button type="button" class="menuRowButton" onclick={() => st.menuModal = "controls"}>CONTROLS</button>
 	<button type="button" class="menuRowButton" onclick={() => st.menuModal = "mods"}>MODS</button>
-	<button type="button" class="menuRowButton" onclick={() => st.menuModal = "market"}>MARKET</button>
+	<button type="button" class="menuRowButton" onclick={() => window.location.assign("/market.html")}>MARKET</button>
 	<button type="button" class="menuRowButton" onclick={() => st.menuModal = "bug"}>REPORT</button>
 </div>
 

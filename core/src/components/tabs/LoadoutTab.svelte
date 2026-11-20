@@ -169,7 +169,7 @@
 			>
 				{camo.name}
 				{#if owned}
-					<span class="ownedTag">OWNED</span>
+					<span class="ownedTag">OWNED{st.unlockSerials.get(`camo:${camo.id}`) ? ` #${st.unlockSerials.get(`camo:${camo.id}`)}` : ""}</span>
 				{:else}
 					<span class="lockHint">{getUnlockScoreThreshold(camo.chance).toLocaleString()} score</span>
 				{/if}
@@ -192,7 +192,9 @@
 				onclick={() => { if (owned) { st.loadout.hat = hat; currentScreen = "main" } }}
 			>
 				{hat.name}
-				{#if !owned}
+				{#if owned}
+					<span class="ownedTag">#{st.unlockSerials.get(`hat:${hat.id}`)}</span>
+				{:else}
 					<span class="lockHint">{getUnlockScoreThreshold(hat.chance).toLocaleString()} score</span>
 				{/if}
 				<CosmeticTooltip type="hat" item={hat} />
@@ -214,7 +216,9 @@
 				onclick={() => { if (owned) { st.loadout.shirt = shirt; currentScreen = "main" } }}
 			>
 				{shirt.name}
-				{#if !owned}
+				{#if owned}
+					<span class="ownedTag">#{st.unlockSerials.get(`shirt:${shirt.id}`)}</span>
+				{:else}
 					<span class="lockHint">{getUnlockScoreThreshold(shirt.chance).toLocaleString()} score</span>
 				{/if}
 				<CosmeticTooltip type="shirt" item={shirt} />
@@ -235,7 +239,11 @@
 				onclick={() => { if (owned) { st.loadout.spray = spray; currentScreen = "main" } }}
 			>
 				{spray.name}
-				{#if !owned}
+				{#if owned}
+					{#if st.unlockSerials.get(`spray:${spray.id}`)}
+						<span class="ownedTag">#{st.unlockSerials.get(`spray:${spray.id}`)}</span>
+					{/if}
+				{:else}
 					<span class="lockHint">{price} KR — MARKET</span>
 				{/if}
 				<SprayTooltip {spray} />

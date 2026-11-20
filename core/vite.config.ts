@@ -17,6 +17,7 @@ export default {
 				clans: fileURLToPath(new URL("./clans.html", import.meta.url)),
 				friends: fileURLToPath(new URL("./friends.html", import.meta.url)),
 				donate: fileURLToPath(new URL("./donate.html", import.meta.url)),
+				market: fileURLToPath(new URL("./market.html", import.meta.url)),
 			},
 		},
 	},

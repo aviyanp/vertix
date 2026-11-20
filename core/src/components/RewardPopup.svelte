@@ -19,7 +19,7 @@
 		<div class="rewardList">
 			{#each st.rewardPopup.items as item}
 				<div class="rewardItem" style:color={getItemRarityColor(item.chance)}>
-					<b>{item.name}</b>
+					<b>{item.name}{#if item.serial} <span class="serialNo">#{item.serial}</span>{/if}</b>
 				</div>
 			{/each}
 		</div>
@@ -66,5 +66,9 @@
 		padding: 10px;
 		font-size: 18px;
 		text-align: center;
+	}
+	.serialNo {
+		color: #9fd;
+		font-size: 13px;
 	}
 </style>

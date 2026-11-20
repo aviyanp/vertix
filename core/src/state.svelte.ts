@@ -125,11 +125,13 @@ export const st = $state({
 		camo: new Set<number>(),
 		spray: new Set<number>(),
 	},
+	// mint serial of each owned copy, keyed "type:id" — shown in the loadout
+	unlockSerials: new Map<string, number>(),
 	unopenedCrateCount: 0,
 	// drives the single shared reward popup mounted in App.svelte
 	rewardPopup: null as
 		| null
-		| { kind: "unlocks"; items: { name: string; chance: number }[] }
+		| { kind: "unlocks"; items: { name: string; chance: number; serial?: number }[] }
 		| { kind: "rankUp"; rank: number }
 		| { kind: "pendingCrates"; count: number }
 		| { kind: "crateOpen"; won: CrateWonItem | null },
@@ -176,8 +178,7 @@ export const st = $state({
 		| "controls"
 		| "mods"
 		| "bug"
-		| "social"
-		| "market",
+		| "social",
 	/**
 	 * Who is playing right now, pushed over the lobby socket.
 	 *

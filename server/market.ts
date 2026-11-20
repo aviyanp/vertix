@@ -71,6 +71,7 @@ export function getMarketPageData(userId: number | undefined): MarketPageData {
 	const items: MarketPageItem[] = [];
 	const owned = userId ? new Map(getUserUnlocks(userId).map((u) => [`${u.item_type}:${u.item_id}`, u])) : new Map();
 
+	const seenKeys = new Set<string>(); // TEMP TEST DEDUPE — camo:125 duplicated in skins.ts
 	for (const [type, catalog] of [
 		["hat", hats],
 		["shirt", shirts],
@@ -78,6 +79,9 @@ export function getMarketPageData(userId: number | undefined): MarketPageData {
 	] as const) {
 		for (const item of catalog) {
 			if (item.hide) continue;
+			const key = `${type}:${item.id}`;
+			if (seenKeys.has(key)) continue;
+			seenKeys.add(key);
 			const price = krPriceForChance(item.chance);
 			const s = stats.get(`${type}:${item.id}`);
 			items.push({

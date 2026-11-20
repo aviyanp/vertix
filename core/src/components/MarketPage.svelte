@@ -217,7 +217,7 @@
 
 <style>
 	/* main.css pins body overflow — the page scrolls in its own container */
-	.page { max-width: 1100px; height: 100vh; overflow-y: auto; margin: 0 auto; padding: 16px; color: #e8e8e8; font-family: "mainFont"; }
+	.page { max-width: 1100px; height: 100vh; height: 100dvh; overflow-y: auto; margin: 0 auto; padding: 16px; color: #e8e8e8; font-family: "mainFont"; }
 	.topbar { display: flex; align-items: baseline; gap: 16px; }
 	.brand { color: #9fd; text-decoration: none; }
 	h1 { font-size: 22px; letter-spacing: 2px; flex: 1; margin: 0; }

@@ -270,6 +270,29 @@ export function initDb(): void {
 	if (indexes.length === 0) {
 		db.exec("CREATE UNIQUE INDEX idx_discord_id ON users(discord_id) WHERE discord_id IS NOT NULL");
 	}
+	const unlockColumns = db.prepare("PRAGMA table_info(user_unlocks)").all() as { name: string }[];
+	if (!unlockColumns.map((c) => c.name).includes("serial")) {
+		// every copy of a cosmetic gets a mint serial, unique within the item,
+		// like printed collectibles — #1 exists exactly once per item
+		db.exec("ALTER TABLE user_unlocks ADD COLUMN serial INTEGER");
+		db.exec(
+			`UPDATE user_unlocks SET serial = (
+				SELECT COUNT(*) FROM user_unlocks o
+				WHERE o.item_type = user_unlocks.item_type
+				  AND o.item_id = user_unlocks.item_id
+				  AND o.rowid <= user_unlocks.rowid
+			)`,
+		);
+	}
+	if (!unlockColumns.map((c) => c.name).includes("listed_price")) {
+		db.exec("ALTER TABLE user_unlocks ADD COLUMN listed_price INTEGER");
+	}
+	db.exec(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_unlock_serial ON user_unlocks(item_type, item_id, serial)",
+	);
+	db.exec(
+		"CREATE INDEX IF NOT EXISTS idx_unlock_listed ON user_unlocks(listed_price) WHERE listed_price IS NOT NULL",
+	);
 	// no SQL milestone-ledger backfill here: flagging every owned item ignores
 	// whether the score threshold was actually met, which would void a sold
 	// item's future milestone. The boot loop in index.ts runs
@@ -497,21 +520,100 @@ export function hasUnlock(userId: number, itemType: UnlockItemType, itemId: numb
 	return row !== undefined;
 }
 
-/** Returns true if this call newly granted the unlock (false if already owned). */
-export function grantUnlock(userId: number, itemType: UnlockItemType, itemId: number): boolean {
-	const result = getDb()
+/**
+ * Grants the unlock, minting its serial (MAX+1 within the item) inside the same
+ * INSERT so a serial can never collide or skip. Returns the serial for a new
+ * grant, null when already owned.
+ */
+export function grantUnlock(userId: number, itemType: UnlockItemType, itemId: number): number | null {
+	const row = getDb()
 		.prepare(
-			"INSERT OR IGNORE INTO user_unlocks (user_id, item_type, item_id) VALUES (?, ?, ?)",
+			`INSERT OR IGNORE INTO user_unlocks (user_id, item_type, item_id, serial)
+			 SELECT ?, ?, ?, COALESCE(MAX(serial), 0) + 1
+			 FROM user_unlocks WHERE item_type = ? AND item_id = ?
+			 RETURNING serial`,
 		)
-		.run(userId, itemType, itemId);
-	return result.changes > 0;
+		.get(userId, itemType, itemId, itemType, itemId) as { serial: number } | undefined;
+	return row?.serial ?? null;
 }
 
+export type UserUnlock = {
+	item_type: UnlockItemType;
+	item_id: number;
+	serial: number;
+	listed_price: number | null;
+};
+
 /** Every item a user owns, for surfacing lock/owned state to the client. */
-export function getUserUnlocks(userId: number): { item_type: UnlockItemType; item_id: number }[] {
+export function getUserUnlocks(userId: number): UserUnlock[] {
 	return getDb()
-		.prepare("SELECT item_type, item_id FROM user_unlocks WHERE user_id = ?")
-		.all(userId) as { item_type: UnlockItemType; item_id: number }[];
+		.prepare("SELECT item_type, item_id, serial, listed_price FROM user_unlocks WHERE user_id = ?")
+		.all(userId) as UserUnlock[];
+}
+
+/** Sets the ask on an owned, unlisted copy. Returns false when the row isn't the seller's free copy. */
+export function listUnlock(userId: number, itemType: string, itemId: number, price: number): boolean {
+	const res = getDb()
+		.prepare(
+			"UPDATE user_unlocks SET listed_price = ? WHERE user_id = ? AND item_type = ? AND item_id = ? AND listed_price IS NULL",
+		)
+		.run(price, userId, itemType, itemId);
+	return res.changes > 0;
+}
+
+export function delistUnlock(userId: number, itemType: string, itemId: number): boolean {
+	const res = getDb()
+		.prepare(
+			"UPDATE user_unlocks SET listed_price = NULL WHERE user_id = ? AND item_type = ? AND item_id = ?",
+		)
+		.run(userId, itemType, itemId);
+	return res.changes > 0;
+}
+
+export type MarketListing = { item_type: string; item_id: number; serial: number; price: number; seller: string };
+
+/** All live listings, newest-serial display handled by the caller. */
+export function getMarketListings(): MarketListing[] {
+	return getDb()
+		.prepare(
+			`SELECT u.item_type, u.item_id, u.serial, u.listed_price AS price, us.username AS seller
+			 FROM user_unlocks u JOIN users us ON us.id = u.user_id
+			 WHERE u.listed_price IS NOT NULL
+			 ORDER BY u.listed_price ASC`,
+		)
+		.all() as MarketListing[];
+}
+
+/** Per-item supply stats in one scan: copies minted and distinct owners. */
+export function getUnlockSupplyStats(): Map<string, { minted: number; owners: number; minPrice: number | null }> {
+	const rows = getDb()
+		.prepare(
+			`SELECT item_type, item_id, COUNT(*) AS minted, COUNT(DISTINCT user_id) AS owners,
+			        MIN(listed_price) AS min_price
+			 FROM user_unlocks GROUP BY item_type, item_id`,
+		)
+		.all() as { item_type: string; item_id: number; minted: number; owners: number; min_price: number | null }[];
+	return new Map(rows.map((r) => [`${r.item_type}:${r.item_id}`, { minted: r.minted, owners: r.owners, minPrice: r.min_price }]));
+}
+
+export type OwnedListingRow = { seller_id: number; price: number };
+
+/** Reads a live listing for purchase; caller must run inside a transaction. */
+export function getListingRow(itemType: string, itemId: number, serial: number): OwnedListingRow | undefined {
+	return getDb()
+		.prepare(
+			"SELECT user_id AS seller_id, listed_price AS price FROM user_unlocks WHERE item_type = ? AND item_id = ? AND serial = ? AND listed_price IS NOT NULL",
+		)
+		.get(itemType, itemId, serial) as OwnedListingRow | undefined;
+}
+
+/** Transfers an unlock row to a new owner and clears its listing; caller inside a transaction. */
+export function transferUnlock(buyerId: number, itemType: string, itemId: number, serial: number): void {
+	getDb()
+		.prepare(
+			"UPDATE user_unlocks SET user_id = ?, listed_price = NULL WHERE item_type = ? AND item_id = ? AND serial = ?",
+		)
+		.run(buyerId, itemType, itemId, serial);
 }
 
 // --- Reward crate queries ---

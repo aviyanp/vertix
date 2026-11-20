@@ -36,7 +36,7 @@ export type DropItemType = Exclude<UnlockItemType, "spray">;
 
 // carries type+id as well as the display fields so callers can render the item's
 // image and tooltip (the scoreboard's "Last Reward" cell needs all four)
-export type UnlockedItem = { type: DropItemType; id: number; name: string; chance: number };
+export type UnlockedItem = { type: DropItemType; id: number; name: string; chance: number; serial?: number };
 
 /**
  * Grants any hat/shirt/camo unlocks the player's lifetime score newly
@@ -67,9 +67,10 @@ export function checkForNewUnlocks(userId: number, lifetimeScore: number): Unloc
 				recordMilestoneGrant(userId, type, item.id);
 				continue;
 			}
-			if (grantUnlock(userId, type, item.id)) {
+			const serial = grantUnlock(userId, type, item.id);
+			if (serial !== null) {
 				recordMilestoneGrant(userId, type, item.id);
-				newlyUnlocked.push({ type, id: item.id, name: item.name, chance: item.chance });
+				newlyUnlocked.push({ type, id: item.id, name: item.name, chance: item.chance, serial });
 			}
 		}
 	}
@@ -141,8 +142,8 @@ function rollDropFromPool(
 			break;
 		}
 	}
-	grantUnlock(userId, chosen.itemType, chosen.id);
-	return { type: chosen.itemType, id: chosen.id, name: chosen.name, chance: chosen.chance };
+	const serial = grantUnlock(userId, chosen.itemType, chosen.id) ?? undefined;
+	return { type: chosen.itemType, id: chosen.id, name: chosen.name, chance: chosen.chance, serial };
 }
 
 /**

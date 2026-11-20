@@ -23,7 +23,6 @@ import {
 } from "./db.ts";
 import { validateSession } from "./session.ts";
 import { openCrateForUser } from "./unlocks.ts";
-import { buyMarketItem, getMarketData, sellMarketItem } from "./market.ts";
 import { getQuestPayload, claimQuestReward, claimStreakRewardForUser, recordLogin } from "./quests.ts";
 import { createRateLimiter } from "./security.ts";
 
@@ -330,44 +329,6 @@ export function setupAuthHandlers(socket: AuthenticatedSocket): void {
 			remaining: getUnopenedCrateCount(socket.userId),
 		});
 	});
-
-	socket.on("getMarketData", () => {
-		if (!socket.userId) {
-			socket.emit("marketData", null);
-			return;
-		}
-		socket.emit("marketData", getMarketData(socket.userId));
-	});
-
-	socket.on("marketBuy", (data: { type?: string; id?: number }) => {
-		if (!rewardClaimLimiter(socket.id)) return;
-		if (!socket.userId || typeof data?.type !== "string" || typeof data?.id !== "number") {
-			socket.emit("marketResult", { success: false, error: "Invalid request" });
-			return;
-		}
-		const result = buyMarketItem(socket.userId, data.type, data.id);
-		socket.emit("marketResult", result);
-		if (result.success) {
-			emitUnlocks(socket);
-			emitAccountStats(socket);
-			socket.emit("marketData", getMarketData(socket.userId));
-		}
-	});
-
-	socket.on("marketSell", (data: { type?: string; id?: number }) => {
-		if (!rewardClaimLimiter(socket.id)) return;
-		if (!socket.userId || typeof data?.type !== "string" || typeof data?.id !== "number") {
-			socket.emit("marketResult", { success: false, error: "Invalid request" });
-			return;
-		}
-		const result = sellMarketItem(socket.userId, data.type, data.id);
-		socket.emit("marketResult", result);
-		if (result.success) {
-			emitUnlocks(socket);
-			emitAccountStats(socket);
-			socket.emit("marketData", getMarketData(socket.userId));
-		}
-	});
 }
 
 /** Push the logged-in account's clan roster/stats to the client, if they're in one. */
@@ -485,10 +446,12 @@ export function emitAccountStats(socket: AuthenticatedSocket): void {
 export function emitUnlocks(socket: AuthenticatedSocket): void {
 	if (!socket.userId) return;
 	const unlocks = getUserUnlocks(socket.userId);
+	const pick = (t: string) =>
+		unlocks.filter((u) => u.item_type === t).map((u) => ({ id: u.item_id, serial: u.serial }));
 	socket.emit("updUnlocks", {
-		hat: unlocks.filter((u) => u.item_type === "hat").map((u) => u.item_id),
-		shirt: unlocks.filter((u) => u.item_type === "shirt").map((u) => u.item_id),
-		camo: unlocks.filter((u) => u.item_type === "camo").map((u) => u.item_id),
-		spray: unlocks.filter((u) => u.item_type === "spray").map((u) => u.item_id),
+		hat: pick("hat"),
+		shirt: pick("shirt"),
+		camo: pick("camo"),
+		spray: pick("spray"),
 	});
 }

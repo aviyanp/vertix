@@ -45,6 +45,14 @@ import {
 import { createOAuthRoutes, logOAuthConfig } from "./oauth.ts";
 import { createAdminRoutes, trackLobbyPlayer, untrackLobbyPlayer, logAdminConfig } from "./admin.ts";
 import { flushAnalytics } from "./analytics.ts";
+import {
+	buyListing,
+	buyMarketItem,
+	delistMarketItem,
+	getMarketPageData,
+	listMarketItem,
+	sellMarketItem,
+} from "./market.ts";
 import { isMaintenanceEnabled } from "./server-ops.ts";
 import { writeServerStat, pruneServerStats } from "./db.ts";
 import {
@@ -537,6 +545,39 @@ api.post("/bugReport", async (c) => {
 	});
 	log.info("bugreport", `new report from ${session?.username ?? "(guest)"} (${clientIp})`);
 	return c.json({ ok: true });
+});
+
+// --- Marketplace HTTP API (the /market page; socket handlers mirror it for
+// the in-game modal) ---
+const marketLimiter = createRateLimiter(30, 60000);
+
+api.get("/market", async (c) => {
+	if (!marketLimiter(httpClientIp(c))) return c.json({ error: "Rate limit exceeded" }, 429);
+	const session = await validateSession(c.req.header("Cookie"));
+	return c.json(getMarketPageData(session?.userId));
+});
+
+api.post("/market/trade", async (c) => {
+	if (!marketLimiter(httpClientIp(c))) return c.json({ error: "Rate limit exceeded" }, 429);
+	const session = await validateSession(c.req.header("Cookie"));
+	if (!session) return c.json({ error: "Log in to trade" }, 401);
+	const data = await c.req.json().catch(() => ({}));
+	const action = typeof data?.action === "string" ? data.action : "";
+	const type = typeof data?.type === "string" ? data.type : "";
+	const id = typeof data?.id === "number" ? Math.floor(data.id) : -1;
+	const result =
+		action === "buy"
+			? buyMarketItem(session.userId, type, id)
+			: action === "sell"
+				? sellMarketItem(session.userId, type, id)
+				: action === "list"
+					? listMarketItem(session.userId, type, id, Math.floor(Number(data?.price)))
+					: action === "delist"
+						? delistMarketItem(session.userId, type, id)
+						: action === "buyListing"
+							? buyListing(session.userId, type, id, Math.floor(Number(data?.serial)))
+							: { success: false, error: "Bad action" };
+	return c.json(result, result.success ? 200 : 400);
 });
 
 // root app: API mounted under /api, static files (production) at /

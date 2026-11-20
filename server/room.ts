@@ -6,7 +6,7 @@ import { characterClasses } from "core/src/loadouts.ts";
 import type { Projectile } from "core/src/logic/projectile.ts";
 import { camos, hats, shirts } from "core/src/skins.ts";
 import { sprays } from "core/src/sprays.ts";
-import { allItems, CUSTOM_ID_BASE } from "./customItems.ts";
+import { allItems, CUSTOM_ID_BASE, itemById } from "./customItems.ts";
 import type { PickupObject, Player, ZoneEvent } from "core/src/types.ts";
 import {
 	dotInRect,
@@ -598,13 +598,13 @@ export class Room {
 				// guests have no account to persist unlocks against, so they keep
 				// today's free-selection behavior; logged-in players must own the item
 				if (isValidHatIndex(id) && (!authSocket.userId || hasUnlock(authSocket.userId, "hat", id))) {
-					player.account.hat = hats[id - 1];
+					player.account.hat = itemById("hat", id) as Player["account"]["hat"];
 				}
 			});
 			socket.on("cShirt", (id) => {
 				if (!cosmeticRateLimiter(socket.id)) return;
 				if (isValidShirtIndex(id) && (!authSocket.userId || hasUnlock(authSocket.userId, "shirt", id))) {
-					player.account.shirt = shirts[id - 1];
+					player.account.shirt = itemById("shirt", id) as Player["account"]["shirt"];
 				}
 			});
 			socket.on("cCamo", (data) => {

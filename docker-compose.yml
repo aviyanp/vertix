@@ -1,0 +1,45 @@
+services:
+  server:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1118:1118"
+    volumes:
+      # Named volume for the database and server-written state: Docker seeds it
+      # with the image's node-owned /app/data, so no host chown step is needed.
+      - vertix-data:/app/data
+      # Texture mods stay host-editable; mount a host mods dir read-only over the
+      # volume's mods/ subdirectory. Create ./data/mods and drop packs there.
+      - ./data/mods:/app/data/mods:ro
+    # Optional: copy .env.example to .env to configure Discord OAuth, the admin
+    # token, CORS origins, or your own SESSION_SECRET — Compose auto-loads .env
+    # for the ${VAR} interpolation below, so no extra config is needed. With no
+    # .env the server still boots: it auto-generates a session secret into the
+    # data volume when SESSION_SECRET is unset.
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET:-}
+      - DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI:-}
+      - ALLOW_LOCAL_LOGIN=${ALLOW_LOCAL_LOGIN:-}
+      - TRUST_PROXY=${TRUST_PROXY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-}
+      - STATUS_INTERVAL_MS=${STATUS_INTERVAL_MS:-}
+    networks:
+      - vertix-net
+
+volumes:
+  vertix-data:
+
+networks:
+  # External so the same network is shared with the reverse proxy (nginx/npm
+  # joins it to reach http://server:1118) and so an operator-created vertix-net
+  # is reused instead of rejected for missing Compose labels. Create once with:
+  #   docker network create vertix-net
+  vertix-net:
+    external: true
+    name: vertix-net

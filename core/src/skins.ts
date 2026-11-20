@@ -1902,7 +1902,7 @@ export const camos = [
 		chance: 100,
 	},
 	{
-		id: 125,
+		id: 134,
 		name: "Tarment",
 		chance: 100,
 	},

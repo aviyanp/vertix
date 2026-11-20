@@ -11,6 +11,15 @@
 		const sortedPlayers = st.players.toSorted(sortPlayersByScore);
 		for (const player of sortedPlayers) {
 			if (!player.team) continue;
+			// Only players who have spawned this round. Someone who joined mid-round
+			// and never took a spawn used to appear on the final scoreboard at 0/0/0.
+			// Our own row always shows: the local player is the one reading this.
+			if (
+				player.index !== st.player.index &&
+				!st.spawnedIndexes.includes(player.index)
+			) {
+				continue;
+			}
 
 			let playerColor = "#fff";
 			if (player.index !== st.player.index) {
@@ -73,7 +82,10 @@
 
 	function onClickCell(cell: StatTableCell) {
 		if (cell.className === "contL" && cell.canClick) {
-			window.open(`/profile.html?${cell.text}`, "_blank");
+			// open the player's profile in the in-game social hub instead of a new tab
+			st.socialProfileUser = String(cell.text);
+			st.socialTab = "profile";
+			st.menuModal = "social";
 		}
 	}
 
@@ -89,12 +101,21 @@
 			st.currentLiked = destIndex;
 		}
 	}
+
+	function onClickModeVote(index: number) {
+		// the canvas has to keep focus or movement keys stop reaching the game
+		document.getElementById("cvs")?.focus();
+		st.socket?.emit("modeVote", index);
+		st.gameOverPanel.myVote = index;
+	}
 </script>
 
-<div id="gameStatWrapper">
-	<p id="nextGameTimer"></p>
+<div id="gameStatWrapper" style:display={st.gameOverPanel.visible ? "block" : "none"}>
+	<p id="nextGameTimer">{st.gameOverPanel.timerText}</p>
 	<div id="gameStatsContainer">
-		<p id="winningTeamText"></p>
+		<p id="winningTeamText" style:color={st.gameOverPanel.winnerColor}>
+			{st.gameOverPanel.winnerText}
+		</p>
 		<table id="gameStatBoard">
 			<thead>
 				<tr>
@@ -116,7 +137,7 @@
 								{#if cell.hoverInfo}
 									<div class="hoverTooltip">
 										{#if cell.hoverInfo.type === "hat"}
-											<img class="hatDisplayImage" src={`/images/hats/${cell.hoverInfo.id}/d.png`}>
+											<img class="hatDisplayImage" src={cell.hoverInfo.image ?? `/images/hats/${cell.hoverInfo.id}/d.png`}>
 											<div class="rewardName" style:color={cell.color}>
 												{cell.hoverInfo.name}
 											</div>
@@ -131,7 +152,7 @@
 												</div>
 											{/if}
 										{:else if cell.hoverInfo.type === "shirt"}
-											<img class="shirtDisplayImage" src={`/images/shirts/${cell.hoverInfo.id}/d.png`}>
+											<img class="shirtDisplayImage" src={cell.hoverInfo.image ?? `/images/shirts/${cell.hoverInfo.id}/d.png`}>
 											<div class="rewardName" style:color={cell.color}>
 												{cell.hoverInfo.name}
 											</div>
@@ -141,7 +162,7 @@
 											</div>
 											<div class="rewardDescription">{cell.hoverInfo.desc}</div>
 										{:else}
-											<img class="camoDisplayImage" src={`/images/camos/${cell.hoverInfo.id + 1}.png`}>
+											<img class="camoDisplayImage" src={cell.hoverInfo.image ?? `/images/camos/${cell.hoverInfo.id + 1}.png`}>
 											<div class="rewardName" style:color={cell.color}>
 												{cell.hoverInfo.name}
 											</div>
@@ -174,7 +195,17 @@
 			</tbody>
 		</table>
 	</div>
-	<div id="voteModeContainer"></div>
+	<div id="voteModeContainer">
+		{#each st.gameOverPanel.modeVotes as vote, i}
+			<button
+				type="button"
+				class={st.gameOverPanel.myVote === i ? "modeVoteButtonA" : "modeVoteButton"}
+				onclick={() => onClickModeVote(i)}
+			>
+				{vote.name}: {vote.votes}
+			</button>
+		{/each}
+	</div>
 </div>
 
 <style>
@@ -279,7 +310,7 @@
 
 	.rewardText {
 		cursor:
-			url("../../assets/cursor_aim.png") 17 17,
+			url("./cursor_aim.png") 17 17,
 			default;
 		pointer-events: all;
 		position: relative;

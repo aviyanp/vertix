@@ -1,5 +1,15 @@
 import type { camos, hats, shirts } from "./skins.ts";
 
+/** One server position sample for a remote player, stamped on arrival. */
+export type NetSnapshot = {
+	/** client receive time (performance.now()) — server and client clocks are never synced */
+	t: number;
+	x: number;
+	y: number;
+	angle: number;
+	jumpY: number;
+};
+
 export type Player = {
 	id: number;
 	room: string;
@@ -40,6 +50,19 @@ export type Player = {
 	isBoss: boolean;
 	loggedIn?: boolean;
 	socketId?: string;
+	/**
+	 * Account id behind this player, when they are signed in. Server-only — it is
+	 * stripped before any broadcast (see withoutServerFields in room.ts) — and it
+	 * is what lets presence, moderation and the admin panel identify a player by
+	 * account rather than by the display name they typed, which anyone can copy.
+	 */
+	userId?: number | null;
+	/** Account username (not the typed display name). Server-only, like userId. */
+	accountName?: string | null;
+	/** Client IP resolved at connect. Server-only, like userId. */
+	ip?: string | null;
+	/** When this player's socket connected. Server-only, like userId. */
+	sessionStartedAt?: number | null;
 	likedBy: number[];
 	totalDamage: number;
 	totalHealing: number;
@@ -47,13 +70,29 @@ export type Player = {
 	damageSources: Record<number, number>; // Player ID : dmg inflicted by player
 	killStreak: number;
 	lastModeVote?: number;
+	/**
+	 * Per-frame rendered speed, in px/ms, for remote players. Derived from the
+	 * interpolated position each frame — NOT from the raw per-packet position
+	 * delta, which is zero on any tick where the server had nothing new for this
+	 * player and used to reset their walk cycle to the idle frame.
+	 */
 	xSpeed?: number;
 	ySpeed?: number;
+	/**
+	 * Recent position snapshots for a remote player, oldest first. Rendering runs
+	 * REMOTE_INTERP_DELAY_MS behind the newest of these and lerps between the two
+	 * that bracket the render time, which is what turns discrete server ticks
+	 * into continuous motion.
+	 */
+	netBuffer?: NetSnapshot[];
+	/** ms since this player last had any rendered motion; drives animation hysteresis. */
+	idleFor?: number;
 	isn?: number;
 	// Currently setting this to true if first spawn into current round, thus needs to receive game mode banner notif.
 	firstReceive?: boolean;
 	spray: Spray;
-	lastItem?: any; // todo (server-side)
+	/** best cosmetic unlocked in the last completed round; drives the scoreboard's "Last Reward" column */
+	lastItem?: StatTableCellHoverInfo;
 	hitFlash?: number;
 	isInHardpoint: boolean;
 	hardpointScore: number;
@@ -61,6 +100,8 @@ export type Player = {
 
 type WeaponBase = {
 	name: string;
+	// sprite folder under sprites/weapons/ when it differs from name (e.g. "???" boss weapons)
+	spriteFolder?: string;
 	weaponIndex: number;
 	dmg: number;
 	ammo: number;
@@ -109,16 +150,20 @@ export type Weapon = WeaponBase &
 		| { explodeOnDeath: false; blastRadius?: undefined }
 	);
 
-export type Hat = (typeof hats)[number] & { count?: number };
-export type Shirt = (typeof shirts)[number] & { count?: number };
-export type Camo = (typeof camos)[number] & { count?: number }[];
+// `image` is set on admin-created custom cosmetics: an absolute URL that
+// replaces the derived /images/<type>s/<id>/... paths everywhere the item renders
+export type Hat = (typeof hats)[number] & { count?: number; image?: string };
+export type Shirt = (typeof shirts)[number] & { count?: number; image?: string };
+export type Camo = (typeof camos)[number] & { count?: number; image?: string }[];
 
 export type Account = {
 	// TODO: maybe these can be refactored into a property of type PlayerProfile?
 	username?: string;
+	avatar?: string; // discord avatar url, empty for password accounts
 	clan?: string;
 	rank: number; // note: even guests have a rank for a given session
 	rankPercent?: number;
+	score?: number; // lifetime score (projected with in-round score during a game)
 	worldRank?: number;
 	likes?: number;
 	kills?: number;
@@ -130,12 +175,16 @@ export type Account = {
 
 	hat?: Hat;
 	shirt?: Shirt;
+	pendingCrates?: number;
+	/** KR balance — earned by winning rounds, spent in the marketplace */
+	kr?: number;
 };
 
 export type Spray = {
 	id: number;
 	name: string;
 	src: string;
+	image?: string;
 	info: {
 		scale: number;
 		alpha: number;
@@ -199,6 +248,14 @@ export type Tile = {
 	hasCollision: boolean;
 	hardPoint: boolean;
 	objTeam: string;
+	/**
+	 * Memoised sprite-cache keys. Both are derived purely from tile geometry, which
+	 * is fixed once setupMap runs, but they were rebuilt from 7-10 fields on every
+	 * lookup — i.e. once per visible tile per frame, three times over. Computed
+	 * lazily on the client; never serialised.
+	 */
+	wallCacheKey?: string;
+	floorCacheKey?: string;
 	edgeTile: boolean;
 };
 
@@ -247,10 +304,29 @@ export type GenData = {
 	data: Uint8ClampedArray;
 };
 
+/**
+ * Column-major index over `MapData.tiles`, built once by setupMap.
+ * Lets collision code look at only the tiles near a point instead of scanning
+ * the whole map (a 24x24 map is ~576 tiles, and the collision loops run per
+ * input packet per player and per bullet sub-step).
+ *
+ * Deliberately holds only the grid's dimensions, not the tile array itself:
+ * mapData is JSON-serialized into the "gameSetup" payload, and a `tiles`
+ * reference in here would ship the whole tile array a second time.
+ */
+export type TileGrid = {
+	cols: number;
+	rows: number;
+	scale: number;
+	originX: number;
+	originY: number;
+};
+
 export type MapData = {
 	gameMode: GameMode;
 	genData: GenData;
 	tiles: Tile[];
+	tileGrid?: TileGrid;
 	clutter: ClutterObject[];
 	pickups: PickupObject[];
 	width: number;
@@ -271,6 +347,8 @@ export type ZoneEvent = {
 	score: number;
 	newX?: number;
 	newY?: number;
+	oldX?: number;
+	oldY?: number;
 };
 
 export type LeaderboardData = {
@@ -304,6 +382,7 @@ export type PlayerProfile = {
 };
 
 export type ClanProfile = {
+	id: number;
 	name: string;
 	position: number;
 	rank: number;
@@ -330,6 +409,7 @@ export type StatTableCellHoverInfo = {
 	type: "hat" | "shirt" | "camo";
 	name: string;
 	chance: number;
+	image?: string;
 	isDuplicate: boolean;
 	desc?: string;
 	weaponName?: string;

@@ -1,6 +1,5 @@
 import { playSound } from "../sound.ts";
 import { st } from "../state.svelte.ts";
-import type { Tile } from "../types.ts";
 import { canSee, getAngle, getDistance, isImageOk, randomFloat, randomInt } from "../utils.ts";
 import { createFlash } from "./flash.ts";
 import { screenShake } from "./shake.ts";
@@ -89,8 +88,21 @@ class Particle {
 	}
 
 	checkInWall() {
-		st.gameMap.tiles.forEach((tmpTl: Tile) => {
-			if (!tmpTl.wall || !tmpTl.hasCollision) return;
+		// tiles form a uniform column-major grid (see setupMap), so the only tiles
+		// whose rect can contain this point are the one at (col, row) and — when x
+		// sits exactly on a tile edge, since the x check is inclusive on both sides —
+		// its left neighbour; a direct index lookup replaces scanning every tile
+		const tiles = st.gameMap.tiles;
+		if (tiles.length === 0) return;
+		const tileScale = tiles[0].scale;
+		const tilePerCol = st.gameMap.genData.height;
+		const col = Math.floor((this.x - tiles[0].x) / tileScale);
+		const row = Math.floor((this.y - tiles[0].y) / tileScale);
+		if (row < 0 || row >= tilePerCol) return;
+		for (let c = col - 1; c <= col; ++c) {
+			if (c < 0 || c >= st.gameMap.genData.width) continue;
+			const tmpTl = tiles[c * tilePerCol + row];
+			if (!tmpTl || !tmpTl.wall || !tmpTl.hasCollision) continue;
 			if (
 				this.x >= tmpTl.x &&
 				this.x <= tmpTl.x + tmpTl.scale &&
@@ -99,7 +111,7 @@ class Particle {
 			) {
 				this.active = false;
 			}
-		});
+		}
 	}
 }
 var cachedParticles: Particle[] = [];
@@ -108,23 +120,20 @@ for (let i = 0; i < 700; ++i) {
 	cachedParticles.push(new Particle());
 }
 export function updateParticles(delta: number, layer: number) {
+	const showParticles = st.settings.showParticles;
 	for (let i = 0; i < cachedParticles.length; ++i) {
+		const particle = cachedParticles[i];
+		if (!particle.active) continue;
 		if (
-			(st.settings.showParticles || cachedParticles[i].forceShow) &&
-			cachedParticles[i].active &&
-			canSee(
-				cachedParticles[i].x - st.startX,
-				cachedParticles[i].y - st.startY,
-				cachedParticles[i].scale,
-				cachedParticles[i].scale,
-			)
+			(showParticles || particle.forceShow) &&
+			canSee(particle.x - st.startX, particle.y - st.startY, particle.scale, particle.scale)
 		) {
-			if (layer === cachedParticles[i].layer) {
-				cachedParticles[i].update(delta);
-				cachedParticles[i].draw();
+			if (layer === particle.layer) {
+				particle.update(delta);
+				particle.draw();
 			}
 		} else {
-			cachedParticles[i].active = false;
+			particle.active = false;
 		}
 	}
 	window.graph.globalAlpha = 1;
@@ -147,6 +156,13 @@ export function particleCone(
 	scale: number,
 	spriteIndex: number,
 	addBulletHole: boolean,
+	/**
+	 * Which particle layer the bullet hole lands on. Layer 0 draws after the wall
+	 * front faces but before clutter, which is right for a hole in a wall and
+	 * wrong for one in a barrel — those were being drawn on the floor *behind*
+	 * the barrel that stopped the bullet. Clutter hits pass 1.
+	 */
+	bulletHoleLayer = 0,
 ) {
 	if (!st.settings.showParticles) return;
 	for (let i = 0; i < count; ++i) {
@@ -166,7 +182,7 @@ export function particleCone(
 		tmpParticle.duration = 0;
 		if (i === 0 && spriteIndex === 2 && addBulletHole) {
 			tmpParticle.spriteIndex = 3;
-			tmpParticle.layer = 0;
+			tmpParticle.layer = bulletHoleLayer;
 		} else {
 			tmpParticle.dir = dir + randomFloat(-spread, spread);
 			tmpParticle.initScale = scale * randomFloat(1.5, 1.8);

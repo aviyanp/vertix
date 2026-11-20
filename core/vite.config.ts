@@ -1,36 +1,37 @@
+import { fileURLToPath } from "node:url";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { defineConfig } from "vite";
+import type { UserConfig } from "vite";
 
-// todo: when we start not using the dev server
-// https://vite.dev/guide/build#multi-page-app
-export default defineConfig(({ mode }) => ({
+export default {
 	appType: "mpa",
-	plugins: [
-		svelte({
-			compilerOptions: {
-				experimental: {
-					async: true,
-				},
-				runes: true,
-				hmr: mode === "development",
-				preserveComments: true,
-				// not ideal
-				warningFilter: (w) => !w.code.includes("a11y"),
-			},
-			inspector: true,
-		}),
-	],
+	plugins: [svelte()],
 	build: {
 		target: "esnext",
+		// https://vite.dev/guide/build#multi-page-app
+		rollupOptions: {
+			input: {
+				main: fileURLToPath(new URL("./index.html", import.meta.url)),
+				admin: fileURLToPath(new URL("./admin.html", import.meta.url)),
+				leaderboards: fileURLToPath(new URL("./leaderboards.html", import.meta.url)),
+				profile: fileURLToPath(new URL("./profile.html", import.meta.url)),
+				clans: fileURLToPath(new URL("./clans.html", import.meta.url)),
+				friends: fileURLToPath(new URL("./friends.html", import.meta.url)),
+				donate: fileURLToPath(new URL("./donate.html", import.meta.url)),
+				market: fileURLToPath(new URL("./market.html", import.meta.url)),
+			},
+		},
 	},
 	server: {
+		// listen on all interfaces so friends on the same network can join via this machine's IP
+		host: true,
 		allowedHosts: [".trycloudflare.com"],
 		proxy: {
 			"/api": "http://localhost:1118",
+			"/mods": "http://localhost:1118",
 			"/socket.io": {
 				target: "http://localhost:1119",
 				ws: true,
 			},
 		},
 	},
-}));
+} satisfies UserConfig;

@@ -1,6 +1,7 @@
 import { gameModes } from "core/src/gamemodes.ts";
 import { weapons } from "core/src/loadouts.ts";
 import { Projectile } from "core/src/logic/projectile.ts";
+import { chooseSpawn } from "core/src/logic/spawn.ts";
 import { sprays } from "core/src/sprays.ts";
 import type {
 	ClutterObject,
@@ -12,7 +13,18 @@ import type {
 	Tile,
 } from "core/src/types.ts";
 import { getDistance, randomInt, setupMap } from "core/src/utils.ts";
+import { getModeMapOverrides } from "./db.ts";
 import { defaultGenData } from "./maps.ts";
+
+// admin-picked per-mode rotations (mode_map_rotation table); re-read on each
+// pick so maker edits take effect without a restart. Entries are validated
+// against the live map pool — a deleted map index just drops out.
+function getModeMaps(mode: (typeof gameModes)[number]): number[] {
+	const override = getModeMapOverrides()
+		.get(mode.name)
+		?.filter((i) => Number.isInteger(i) && i >= 0 && i < defaultGenData.length);
+	return override?.length ? override : mode.maps;
+}
 
 export class Game {
 	roomName = "";
@@ -48,7 +60,7 @@ export class Game {
 	constructor(name: string) {
 		this.roomName = name;
 		this.mode = gameModes[0];
-		this.mapData = this.newMap(defaultGenData[this.mode.maps[0]]);
+		this.mapData = this.newMap(defaultGenData[getModeMaps(this.mode)[0]]);
 	}
 
 	newPlayer() {
@@ -59,7 +71,7 @@ export class Game {
 			room: this.roomName,
 			index: sid,
 			name: "UNKNOWN",
-			account: { clan: "DEV", rank: 0 },
+			account: { clan: "", rank: 0 },
 			classIndex: 0,
 			currentWeapon: 0,
 			weapons: [this.weapons[0]],
@@ -99,7 +111,7 @@ export class Game {
 			firstReceive: true,
 			isBoss: false,
 			spray: {
-				src: "/assets/sprays/1.png",
+				src: "/images/sprays/1.png",
 				...sprays[0],
 			},
 			isInHardpoint: false,
@@ -144,10 +156,7 @@ export class Game {
 		setupMap(tmpMap, this.tileScale, []);
 		for (const tl of this.tiles) {
 			if (!tl.hardPoint) {
-				if (
-					tl.objTeam === "red" ||
-					(tl.objTeam === "blue" && this.mode.teams)
-				) {
+				if (tl.objTeam === "red" || tl.objTeam === "blue") {
 					this.spawnTiles.push(tl);
 				}
 			} else if (this.mode.code === "hp" || this.mode.code === "zmtch") {
@@ -158,9 +167,23 @@ export class Game {
 	}
 
 	getSpawn(player: Player) {
-		const spawnTiles = this.mode.teams
+		const tileMid = this.tileScale / 2;
+		const teamTiles = this.mode.teams
 			? this.spawnTiles.filter((tile) => tile.objTeam === player.team)
 			: this.spawnTiles;
+		// a team mode on a map that only paints one colour still has to spawn everyone
+		const spawnTiles = teamTiles.length > 0 ? teamTiles : this.spawnTiles;
+
+		if (spawnTiles.length === 0) {
+			// No spawn tiles on this map. The old fallback was a fixed (tileMid, tileMid),
+			// which is near the top-left corner whatever the map size and is usually solid
+			// rock — the "spawned inside a wall" report. Any open tile is strictly better.
+			const openTile = this.tiles.find((tl) => !tl.wall && !tl.edgeTile);
+			return openTile
+				? { x: openTile.x + tileMid, y: openTile.y + tileMid }
+				: { x: tileMid, y: tileMid };
+		}
+
 		const activeEnemies = this.players.filter(
 			(plr) =>
 				!plr.dead &&
@@ -168,25 +191,22 @@ export class Game {
 				plr.index !== player.index &&
 				(!this.mode.teams || plr.team !== player.team),
 		);
-		const tileMid = this.tileScale / 2;
 
-		let bestSpawnPosition = { x: tileMid, y: tileMid };
-		let bestSpawnDistance = -Infinity;
-
-		for (const tl of spawnTiles) {
-			const spawnPosition = { x: tl.x + tileMid, y: tl.y + tileMid };
-			const closestEnemyDistance = Math.min(
-				...activeEnemies.map((plr) =>
-					getDistance(plr.x, plr.y, spawnPosition.x, spawnPosition.y),
-				),
-			);
-			if (closestEnemyDistance > bestSpawnDistance) {
-				bestSpawnPosition = spawnPosition;
-				bestSpawnDistance = closestEnemyDistance;
+		// Scanning from a random offset is what keeps a round start from stacking the
+		// whole lobby on one tile: immediately after newRound nobody is alive or on
+		// screen, so every candidate ties, and whichever one is examined first wins.
+		// It used to be tiles[0] every time (Math.min of an empty list is Infinity,
+		// and nothing can then beat Infinity), so everyone spawned on one square.
+		const candidates = spawnTiles.map((tl) => ({
+			x: tl.x + tileMid,
+			y: tl.y + tileMid,
+		}));
+		return (
+			chooseSpawn(candidates, activeEnemies, randomInt(0, candidates.length - 1)) ?? {
+				x: tileMid,
+				y: tileMid,
 			}
-		}
-
-		return bestSpawnPosition;
+		);
 	}
 
 	genClutter() {
@@ -248,7 +268,8 @@ export class Game {
 		this.score.blue = 0;
 		this.score.lb = 0;
 		this.mode = gameModes[modeIndex];
-		const mapIndex = this.mode.maps[randomInt(0, this.mode.maps.length - 1)];
+		const rotation = getModeMaps(this.mode);
+		const mapIndex = rotation[randomInt(0, rotation.length - 1)];
 		this.mapData = genData
 			? this.newMap(genData)
 			: this.newMap(defaultGenData[mapIndex]);
@@ -267,10 +288,25 @@ export class Game {
 			pl.isBoss = false;
 			pl.onScreen = false;
 			pl.dead = true;
-			pl.lastModeVote = undefined; //TODO
-			pl.team = this.getTeam(pl.index);
+			pl.lastModeVote = undefined;
 			pl.firstReceive = true;
 			pl.likedBy = [];
+			// stale value would show last round's reward as this round's on the
+			// end screen for anyone who earned nothing new
+			pl.lastItem = undefined;
+		}
+
+		// Boss Hunt needs exactly one boss, deterministically assigned to the
+		// earliest player in the room.
+		if (this.mode.code === "boss") {
+			const boss = this.players[0];
+			for (const pl of this.players) {
+				pl.team = pl === boss ? "blue" : "red";
+			}
+		} else {
+			for (const pl of this.players) {
+				pl.team = this.getTeam(pl.index);
+			}
 		}
 		this.genClutter();
 		this.genPickups();

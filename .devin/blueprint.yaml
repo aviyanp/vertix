@@ -1,0 +1,17 @@
+maintenance: |
+  pnpm install
+knowledge:
+  - name: dev
+    contents: |
+      # `pnpm dev` — game at http://localhost:5173, API on :1118, socket.io on :1119.
+      # Boots with zero config: dev-only SESSION_SECRET fallback; accounts use
+      # username-only local login when DISCORD_CLIENT_ID is unset. DB: server/vertix.db.
+  - name: typecheck
+    contents: |
+      # pnpm typecheck (svelte-check for core, tsc --noEmit for server)
+  - name: test
+    contents: |
+      # pnpm test (node --test for both packages)
+  - name: build
+    contents: |
+      # pnpm -F core build (vite MPA build into core/dist)

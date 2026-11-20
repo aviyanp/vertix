@@ -1,13 +1,14 @@
 import * as zip from "@zip.js/zip.js";
-import DOMPurify from "dompurify";
 import { io, type Socket } from "socket.io-client";
 import { flushSync, mount } from "svelte";
 import { resetCooldownAnimations } from "./components/ActionBar.svelte";
 import App from "./components/App.svelte";
-import { weaponNames } from "./loadouts.ts";
+import { weaponNames, weapons, characterClasses as baseCharacterClasses } from "./loadouts.ts";
 import { Projectile } from "./logic/projectile.ts";
+import { sampleSnapshots, pruneSnapshots } from "./logic/interpolation.ts";
 import { loadSounds, playSound, startSoundTrack, stopAllSounds } from "./sound.ts";
-import { st } from "./state.svelte.ts";
+import { containsBadWord } from "./badWords.ts";
+import { st, type CrateWonItem } from "./state.svelte.ts";
 import type {
 	Account,
 	CachedSpriteData,
@@ -17,6 +18,7 @@ import type {
 	GameMode,
 	Hat,
 	InputSendData,
+	NetSnapshot,
 	Player,
 	Shirt,
 	ShootEvent,
@@ -57,6 +59,7 @@ const {
 	randomInt,
 	canSee,
 	TeamColors,
+	getItemRarityColor,
 } = utils;
 
 mount(App, {
@@ -66,20 +69,64 @@ flushSync();
 
 var socket: Socket = null!; // O_O
 var reason: string | undefined;
-var fillCounter = 0;
 var delta = 0;
-var currentTime = Date.now();
-var oldTime = Date.now();
+var currentTime = performance.now();
+var oldTime = performance.now();
+// A backgrounded tab, a GC pause or a slow asset load produces an enormous
+// frame delta, which fed straight into position integration as a teleport.
+const MAX_FRAME_DELTA_MS = 100;
 var inputNumber = 0;
 var thisInput: InputSendData[] = [];
+/**
+ * Movement used to be emitted once per *rendered* frame, so a 240Hz client sent
+ * 240 packets a second for the same movement a 60Hz client described in 60.
+ * Consecutive frames are now merged into one packet, but only while the
+ * direction and jump flag are identical — which is exactly the case where
+ * movement is linear in delta (`x += hdt * speed * dt` is additive), so the
+ * merged packet simulates to the same position as the frames it replaces. Any
+ * change of direction, or a jump, flushes immediately, so input latency is
+ * unchanged; only the redundant duplicate packets go away.
+ */
+const INPUT_TICK_MS = 16;
+/** earliest the local player may fire any weapon; see the fire test in updateGameLoop */
+var nextLocalShotAt = 0;
+var pendingInput: InputSendData | null = null;
 
-if (/Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent)) {
-	st.mobile = true;
-	hideMenuUI();
-	hideUI(true);
-	alert("tried to open google play");
-	// openGooglePlay(false);
+function flushMovementInput() {
+	if (!pendingInput) return;
+	socket.emit("4", pendingInput);
+	pendingInput = null;
 }
+
+function queueMovementInput(
+	hdt: number,
+	vdt: number,
+	jump: number,
+	delta: number,
+	timestamp: number,
+) {
+	if (
+		pendingInput &&
+		pendingInput.hdt === hdt &&
+		pendingInput.vdt === vdt &&
+		pendingInput.s === jump &&
+		pendingInput.delta + delta < INPUT_TICK_MS
+	) {
+		pendingInput.delta += delta;
+		pendingInput.ts = timestamp;
+		return;
+	}
+	flushMovementInput();
+	pendingInput = { hdt, vdt, ts: timestamp, isn: inputNumber, s: jump, delta };
+	inputNumber++;
+	// Recorded for reconciliation *now*, not at flush: this frame's movement has
+	// already been predicted locally, so if the server's ack landed before the
+	// packet went out, the replay would rewind the player by the missing step.
+	// thisInput holds the same object, so a later merge updates both.
+	thisInput.push(pendingInput);
+	if (delta >= INPUT_TICK_MS || jump === 1) flushMovementInput();
+}
+
 var inMainMenu = true;
 
 const loadingWrapper = document.getElementById("loadingWrapper")!;
@@ -91,9 +138,26 @@ declare global {
 }
 window.startGame = startGame;
 async function startGame() {
+	if (st.startingGame || st.changingLobby) return;
+	// a name is required, and it must not contain a banned word
+	const name = st.playerName.replace(/(<([^>]+)>)/gi, "").trim();
+	if (name.length === 0) {
+		st.messages.name = "Please enter a name to play.";
+		return;
+	}
+	if (containsBadWord(name)) {
+		st.messages.name = "That name contains a banned word.";
+		return;
+	}
+	st.messages.name = "";
+	st.playerName = name.substring(0, 25);
+	// no room chosen by hand → autojoin the best available one and wait for its
+	// connection to settle, then fall through and enter the game in this same flow
+	if (!st.room) {
+		if (!(await autoJoinRoom())) return; // no rooms available; let the player pick manually
+	}
 	if (!st.startingGame && !st.changingLobby) {
 		st.startingGame = true;
-		st.playerName = st.playerName.replace(/(<([^>]+)>)/gi, "").substring(0, 25);
 
 		document.getElementById("loadText")!.textContent = "LOADING ASSETS";
 		loadingWrapper.style.display = "block";
@@ -111,9 +175,7 @@ function enterGame() {
 	startSoundTrack(2);
 	document.getElementById("startMenuWrapper")!.style.display = "none";
 	mainCanvas.focus();
-	if (!st.room) {
-		socket.emit("create");
-	}
+
 	hideMenuUI();
 	animateOverlay = true;
 	if (st.player.dead) {
@@ -124,28 +186,138 @@ function enterGame() {
 		inMainMenu = false;
 		st.startingGame = false;
 		if (st.gameOver) {
-			document.getElementById("gameStatWrapper")!.style.display = "block";
+			st.gameOverPanel.visible = true;
 		} else {
 			showUI();
 		}
 	}
 }
-var clanDBMessage = document.getElementById("clanDBMessage")!;
-var clanStats = document.getElementById("clanStats")!;
-var clanSignUp = document.getElementById("clanSignUp")!;
-var clanHeader = document.getElementById("clanHeader")!;
-var clanAdminPanel = document.getElementById("clanAdminPanel")!;
-var leaveClanButton = document.getElementById("leaveClanButton")!;
-var clanInvMessage = document.getElementById("clanInvMessage")!;
-var clanChtMessage = document.getElementById("clanChtMessage")!;
-var loginMessage = document.getElementById("loginMessage")!;
-var serverCreateMessage = document.getElementById("serverCreateMessage")!;
+const oauthErrorMessages: Record<string, string> = {
+	oauth_failed: "Discord login failed. Please try again.",
+	invalid_state: "Discord login expired. Please try again.",
+	no_code: "Discord login was cancelled.",
+	access_denied: "Discord login was cancelled.",
+};
+function showLoginError(error: string) {
+	st.messages.login = oauthErrorMessages[error] ?? `Login error: ${error}`;
+}
+
+// surface errors from the OAuth callback redirect (/?error=...) and strip the
+// param before window.onload interprets location.search as a room code
+const oauthError = new URLSearchParams(location.search).get("error");
+if (oauthError) {
+	history.replaceState(null, "", "/");
+	showLoginError(oauthError);
+}
+
+// the OAuth popup posts back here when it finishes (see /api/auth/discord?popup=1)
+window.addEventListener("message", (event) => {
+	if (event.origin !== location.origin) return;
+	if (!event.data || event.data.type !== "vertix:discord-login") return;
+	if (event.data.error) {
+		showLoginError(event.data.error);
+	} else {
+		refreshLogin();
+	}
+});
+
+// admin-created cosmetics live server-side; pull them into the local catalogs
+// so they show in the loadout before any room join (rooms re-send the merged
+// catalogs via updHt/updShrt/updCmo anyway)
+type CustomCosmetic = {
+	id: number;
+	type: "hat" | "shirt" | "camo" | "spray";
+	name: string;
+	chance: number;
+	price: number | null;
+	hide: boolean;
+	image: string;
+};
+async function loadCustomCosmetics() {
+	try {
+		const resp = await fetch("/api/customCosmetics");
+		if (!resp.ok) return;
+		const { items } = (await resp.json()) as { items: CustomCosmetic[] };
+		for (const item of items) {
+			if (item.hide) continue;
+			if (item.type === "spray") {
+				if (!st.sprays.some((s) => s.id === item.id)) {
+					st.sprays.push({
+						id: item.id,
+						name: item.name,
+						src: item.image,
+						image: item.image,
+						info: { scale: 64, alpha: 1, resolution: 30 },
+					} as (typeof st.sprays)[number]);
+				}
+			} else if (item.type === "camo") {
+				if (!st.cosmetics.camos[0].some((c) => c.id === item.id)) {
+					(st.cosmetics.camos[0] as { id: number; name: string; chance: number; image?: string }[]).push({
+						id: item.id,
+						name: item.name,
+						chance: item.chance,
+						image: item.image,
+					});
+				}
+			} else {
+				const list = (item.type === "hat" ? st.cosmetics.hats : st.cosmetics.shirts) as {
+					id: number;
+					name: string;
+					chance: number;
+					image?: string;
+					nameY?: number;
+				}[];
+				if (!list.some((c) => c.id === item.id)) {
+					list.push({
+						id: item.id,
+						name: item.name,
+						chance: item.chance,
+						image: item.image,
+						...(item.type === "hat" ? { nameY: 0 } : {}),
+					});
+				}
+			}
+		}
+	} catch {}
+}
+void loadCustomCosmetics();
+
+// pick up the session cookie without reloading: apply the account to the UI and,
+// when safely in the menu, reconnect the room socket so its handshake (which is
+// what ties round stats to the account) carries the fresh session
+async function refreshLogin(): Promise<boolean> {
+	const resp = await fetch("/api/auth/me");
+	if (!resp.ok) return false;
+	const account = (await resp.json()) as Account;
+	applyAccount(account);
+	if (!st.gameStart && st.room && !st.changingLobby) {
+		const room = st.room;
+		st.player.room = "";
+		joinRoom(room);
+	} else if (!st.room && !st.changingLobby) {
+		// in the menu (no room): reconnect the lobby socket so its handshake carries
+		// the fresh Discord session cookie. The server then authenticates it and
+		// pushes account/quests/unlocks for the now-logged-in user.
+		openLobby();
+	}
+	return true;
+}
+window.refreshLogin = refreshLogin;
+
+// The menu connects to the root ("lobby") namespace so account stats, quests and
+// owned cosmetics are available before joining a game room. joinRoom() closes this
+// socket and opens the room socket when the player actually enters a game.
+function openLobby() {
+	if (socket) socket.close();
+	// forceNew: give the lobby its own manager so closing it when we join a room
+	// (joinRoom) can't disturb the room socket's handshake (socket.io multiplexes
+	// same-origin namespaces over a shared connection by default)
+	socket = io({ forceNew: true });
+	st.socket = socket;
+	setupSocket(socket);
+}
 
 window.onload = async () => {
-	if (st.mobile) {
-		document.getElementById("loadText")!.textContent = "MOBILE VERSION COMING SOON";
-		return;
-	}
 	drawMenuBackground();
 	hideUI(true);
 	resize();
@@ -154,49 +326,114 @@ window.onload = async () => {
 		loadingWrapper.style.display = "none";
 	});
 
+	// social deep links first: the retired standalone pages redirect here as
+	// /?social=<tab>&user=<name>, and that string must never fall through to the
+	// room-code branch below
+	const socialParams = new URLSearchParams(location.search);
+	const socialTab = socialParams.get("social");
+	if (socialTab) {
+		if (["profile", "friends", "clans", "leaderboards"].includes(socialTab)) {
+			st.socialTab = socialTab as typeof st.socialTab;
+		}
+		st.socialProfileUser = socialParams.get("user");
+		st.socialClanFocus = socialParams.get("clan");
+		st.menuModal = "social";
+		history.replaceState(null, "", "/");
+		openLobby();
+		return;
+	}
+	// only join automatically when the URL carries an explicit invite (?ROOMCODE).
+	// otherwise we no longer autojoin on load: the player picks a room by hand from
+	// the browser, and autojoin is used purely as a fallback at ENTER GAME (see
+	// startGame) when no room was selected. the loadout is seeded from the local
+	// catalog so the menu is usable before any connection.
 	const roomName = location.search.substring(1) || "";
-	joinRoom(roomName);
+	if (roomName) {
+		joinRoom(roomName);
+	} else {
+		// connect the lobby socket so a logged-in player's account/quests/unlocks
+		// load in the menu without joining a game room
+		openLobby();
+	}
 };
 
-var newUsernameInput = document.getElementById("newUsernameInput")! as HTMLInputElement;
-var youtubeChannelInput = document.getElementById("youtubeChannelInput")! as HTMLInputElement;
-var editProfileMessage = document.getElementById("editProfileMessage")!;
-function updateAccountPage(a: Account) {
-	st.player.account = a;
-	document.getElementById("profileButton")!.onclick = () => {
-		if (st.player.account.username) {
-			showUserStatPage(st.player.account.username);
-		}
-	};
-	newUsernameInput.value = st.player.account.username ?? "";
-	youtubeChannelInput.value = st.player.account.channel ?? "";
-	document.getElementById("saveAccountData")!.onclick = () => {
-		socket.emit("dbEditUser", {
-			userName: newUsernameInput.value,
-			userChannel: youtubeChannelInput.value,
+// resolved by the "welcome" handler so autoJoinRoom can wait for the handshake
+let resolveRoomJoin: (() => void) | null = null;
+// fetch the best available room, join it, and wait until its "welcome" handshake
+// lands (so st.room and cosmetics/unlocks are ready). resolves false if no room
+// is joinable, so the ENTER button can recover instead of hanging.
+async function autoJoinRoom(): Promise<boolean> {
+	try {
+		const resp = await fetch("/api/autoJoin");
+		const data = (await resp.json()) as { room: string | null };
+		if (!data.room) return false;
+		if (!(await joinRoom(data.room))) return false;
+		await new Promise<void>((resolve) => {
+			resolveRoomJoin = resolve;
+			// safety net: never leave ENTER GAME hung if "welcome" never arrives
+			setTimeout(() => {
+				if (resolveRoomJoin === resolve) {
+					resolveRoomJoin = null;
+					resolve();
+				}
+			}, 8000);
 		});
-		editProfileMessage.textContent = "Please Wait...";
-	};
-	clanAdminPanel.style.display = "none";
-	leaveClanButton.style.display = "none";
-	if (a.clan !== "") {
-		clanSignUp.style.display = "none";
-		clanStats.style.display = "block";
-		leaveClanButton.style.display = "inline-block";
-		leaveClanButton.textContent = "LEAVE CLAN";
-		clanHeader.textContent = `[${a.clan}] CLAN:`;
-		if (a.isClanOwner) {
-			clanAdminPanel.style.display = "block";
-			leaveClanButton.textContent = "DELETE CLAN";
-		}
-	} else {
-		clanSignUp.style.display = "block";
-		clanStats.style.display = "none";
-		clanHeader.textContent = "Clans";
+		// let the initial handshake settle before the caller spawns us in — the
+		// server sends yourRoom/welcome/cosmetics/unlocks in a burst and respawning
+		// mid-burst can get overwritten (when a room is picked by hand this gap
+		// happens naturally between selecting the room and pressing ENTER)
+		await new Promise<void>((resolve) => setTimeout(resolve, 350));
+		return !!st.room;
+	} catch {
+		return false;
 	}
 }
+
+// shown at most once per page load, the first time we learn crates are
+// waiting — later room switches/reconnects push the same account payload
+// again and shouldn't re-open the popup every time
+var pendingCratesModalShown = false;
+// applies a logged-in account to the UI; receives the server's "updAccStat"
+// payload (pushed when the socket carries a valid session cookie) and the
+// /api/auth/me response after an OAuth popup login
+function applyAccount(account: Account) {
+	if (account.username) {
+		st.playerName = account.username;
+		localStorage.setItem("userName", account.username);
+		st.loggedIn = true;
+		st.player.loggedIn = true;
+		const user = findUserByIndex(st.player.index);
+		if (user) {
+			user.loggedIn = true;
+		}
+		// request quest data for this user
+		socket?.emit("getQuests");
+	}
+	if (typeof account.pendingCrates === "number") {
+		st.unopenedCrateCount = account.pendingCrates;
+		if (account.pendingCrates > 0 && !pendingCratesModalShown) {
+			pendingCratesModalShown = true;
+			st.rewardPopup = { kind: "pendingCrates", count: account.pendingCrates };
+		}
+	}
+	updateAccountPage(account);
+}
+// The account panel is Svelte (AccountWidget.svelte), which renders inside a
+// {#if}-gated modal. This function used to reach into it with getElementById at
+// module scope — before the modal had ever been opened, so every lookup returned
+// null and this threw on the first `updAccStat`. That silently killed the SAVE
+// button binding and left the CLANS section permanently display:none, making
+// clan create/join unreachable even though the server handlers all worked.
+// Everything is derived from `st` now; the component reacts on its own.
+function updateAccountPage(a: Account) {
+	st.player.account = a;
+}
 function showUserStatPage(userName: string) {
-	window.open(`/profile.html?${userName}`, "_blank");
+	// in-game name clicks open the hub's profile tab; the hub is mounted outside
+	// #startMenuWrapper so it is reachable while a game is running
+	st.socialProfileUser = userName;
+	st.socialTab = "profile";
+	st.menuModal = "social";
 }
 var gameWidth = 0;
 var gameHeight = 0;
@@ -241,6 +478,67 @@ var targetChanged = true;
 function focusGame() {
 	mainCanvas.focus();
 }
+
+// --- touch input bridge -------------------------------------------------------
+// TouchControls.svelte is a pure overlay: it drives the same `keys` / `target`
+// state the mouse and keyboard do, so no gameplay code needs a mobile branch.
+const touchMove = { x: 0, y: 0, active: false };
+const touchInput = {
+	move(x: number, y: number) {
+		touchMove.x = x;
+		touchMove.y = y;
+		touchMove.active = x !== 0 || y !== 0;
+	},
+	stopMove() {
+		touchMove.x = 0;
+		touchMove.y = 0;
+		touchMove.active = false;
+	},
+	/** `f` matches the mouse convention: the angle from the cursor back to the player */
+	aim(f: number, distance: number) {
+		target.f = utils.roundNumber(f, 2);
+		target.d = utils.roundNumber(distance, 2);
+		target.dOffset = utils.roundNumber(target.d / 4, 1);
+		targetChanged = true;
+	},
+	setFiring(firing: boolean) {
+		keys.lm = firing;
+	},
+	jump() {
+		// held for a couple of frames so updateGameLoop's jump check sees it
+		keys.s = true;
+		window.setTimeout(() => {
+			keys.s = false;
+		}, 80);
+	},
+	reload() {
+		const me = findUserByIndex(st.player.index);
+		if (me) playerReload(me, true);
+	},
+	swapWeapon(direction: number) {
+		playerSwapWeapon(findUserByIndex(st.player.index), direction);
+	},
+	spray() {
+		sendSpray();
+	},
+	toggleScoreboard() {
+		if (showingScoreBoard) {
+			hideStatTable();
+		} else if (st.gameStart && !st.player.dead && !st.gameOver) {
+			showingScoreBoard = true;
+			showStatTable(null, null, true, true);
+		}
+	},
+	openMenu() {
+		if (st.gameStart) showESCMenu();
+	},
+};
+declare global {
+	interface Window {
+		touchInput: typeof touchInput;
+	}
+}
+window.touchInput = touchInput;
 function gameInput(event: MouseEvent) {
 	event.preventDefault();
 	event.stopPropagation();
@@ -423,19 +721,23 @@ function kickPlayer(secondReason: string) {
 
 let pingStart = 0;
 function receivePing() {
-	st.ping = Date.now() - pingStart;
+	document.getElementById("pingText")!.replaceChildren(<>PING {Date.now() - pingStart}</>);
 }
 var pingInterval: ReturnType<typeof setInterval> | null = null;
 function setupSocket(sock: Socket) {
-	// logging, ignoring packets that are spammy
-	sock.onAny((event, ...args) => {
-		if (["pong1", "rsd"].includes(event)) return;
-		console.info("%c <= ", "background:#FF6A19;color:#000", event, args);
-	});
-	sock.onAnyOutgoing((event, ...args) => {
-		if (["ping1", "0", "4"].includes(event)) return;
-		console.info("%c => ", "background:#7F7;color:#000", event, args);
-	});
+	// dev-only packet logging: this fires for every inbound and outbound event, so
+	// in a production build it was formatting a console line for each frame's
+	// upd/1/2 traffic on top of retaining the args
+	if (import.meta.env.DEV) {
+		sock.onAny((event, ...args) => {
+			if (["pong1", "rsd"].includes(event)) return;
+			console.info("%c <= ", "background:#FF6A19;color:#000", event, args);
+		});
+		sock.onAnyOutgoing((event, ...args) => {
+			if (["ping1", "0", "4"].includes(event)) return;
+			console.info("%c => ", "background:#7F7;color:#000", event, args);
+		});
+	}
 	sock.on("pong1", receivePing);
 	if (pingInterval != null) {
 		clearInterval(pingInterval);
@@ -444,16 +746,22 @@ function setupSocket(sock: Socket) {
 		pingStart = Date.now();
 		sock.emit("ping1");
 	}, 2000);
-	sock.on("yourRoom", (roomName) => {
+	sock.on("yourRoom", (roomName: string, ranked?: boolean) => {
 		st.room = roomName;
+		st.roomRanked = ranked !== false;
 		st.changingLobby = false;
 	});
 	sock.on("connect_failed", () => {
 		kickPlayer("Connection failed. Please check your internet connection.");
 	});
 	sock.on("disconnect", (reason) => {
+		if (import.meta.env.DEV) console.debug("socket disconnected:", reason);
+		// "io client disconnect" means *we* closed it — switching rooms, or reopening
+		// the lobby socket after a Discord login so the handshake carries the new
+		// cookie. That is not a dropout. Treating it as one kicked the player to the
+		// "Disconnected" screen the moment they signed in from the menu.
+		if (reason === "io client disconnect") return;
 		kickPlayer("Disconnected. Your connection timed out.");
-		console.log(reason);
 	});
 	sock.on("error", (errorMsg) => {
 		console.log("PLEASE NOTIFY THE DEVELOPER OF THE FOLLOWING ERROR");
@@ -468,157 +776,135 @@ function setupSocket(sock: Socket) {
 			(c) => c.folderName === st.loadout.class.folderName,
 		);
 		st.player.isInHardpoint = false;
+		// a new round re-arms everyone's spawn gate server-side (Game.newRound), so
+		// the scoreboard's "has played this round" list starts empty again too
+		st.spawnedIndexes = [];
 		player.name = st.player.name;
-		sock.emit("gotit", player, init, Date.now(), false);
+		// no timestamp: the server refuses to trust the client's clock and takes its
+		// own Date.now(), so sending one only implied an authority that isn't there
+		sock.emit("gotit", player, init);
 		st.player.dead = true;
 		if (init) {
 			deactiveAllAnimTexts();
 			st.gameStart = false;
 			hideUI(false);
-			document.getElementById("startMenuWrapper")!.style.display = "block";
+			document.getElementById("startMenuWrapper")!.style.display = "flex";
 		}
 		if (st.gameOver) {
-			document.getElementById("gameStatWrapper")!.style.display = "none";
+			st.gameOverPanel.visible = false;
 		}
 		st.gameOver = false;
 		gameOverFade = false;
 		targetChanged = true;
-		if (st.mobile) {
-			hideMenuUI();
-			hideUI(true);
-			document.getElementById("startMenuWrapper")!.style.display = "none";
-		}
 		resize();
+		// unblock an autojoin-at-ENTER that's waiting for this handshake, so
+		// startGame can continue straight into the game (see autoJoinRoom)
+		if (resolveRoomJoin) {
+			const resolve = resolveRoomJoin;
+			resolveRoomJoin = null;
+			resolve();
+		}
 	});
 	sock.on("cSrvRes", (a, d) => {
 		if (d) {
-			serverCreateMessage.textContent = `Success. Created server with IP: ${a}`;
+			st.messages.serverCreate = `Success. Created server with IP: ${a}`;
 		} else {
-			serverCreateMessage.textContent = a;
+			st.messages.serverCreate = a;
 		}
 	});
-	sock.on("regRes", (a, d) => {
-		if (!d) {
-			loginMessage.style.display = "block";
+	// The clan panel renders off st.player.account.clan / .isClanOwner, so these
+	// handlers only have to update state — they used to poke at DOM nodes that
+	// were captured before the modal existed and were therefore always null.
+	function applyClanMembership(clan: string, isOwner: boolean) {
+		st.player.account.clan = clan;
+		st.player.account.isClanOwner = isOwner;
+		const user = findUserByIndex(st.player.index);
+		if (user) {
+			user.account.clan = clan;
 		}
-		loginMessage.textContent = a;
-	});
-	sock.on("logRes", (a, d) => {
-		if (d) {
-			loginMessage.style.display = "none";
-			loginMessage.textContent = "";
-			st.playerName = a.text;
-			localStorage.setItem("logKey", a.logKey);
-			localStorage.setItem("userName", a.text);
-			st.loggedIn = true;
-			st.player.loggedIn = true;
-			const user = findUserByIndex(st.player.index);
-			if (user) {
-				user.loggedIn = true;
-			}
-		} else {
-			loginMessage.style.display = "block";
-			loginMessage.textContent = a;
-		}
-	});
-	sock.on("recovRes", (b, d) => {
-		loginMessage.style.display = "block";
-		loginMessage.textContent = b;
-		if (!d) return;
-		document.getElementById("recoverForm")!.style.display = "block";
-		const chngPassKey = document.getElementById("chngPassKey")! as HTMLInputElement;
-		const chngPassPass = document.getElementById("chngPassPass")! as HTMLInputElement;
-		document.getElementById("chngPassButton")!.onclick = () => {
-			loginMessage.style.display = "block";
-			loginMessage.textContent = "Please Wait...";
-			sock.emit("dbCngPass", {
-				passKey: chngPassKey.value,
-				newPass: chngPassPass.value,
-			});
-			sock.on("cngPassRes", (a, b) => {
-				loginMessage.style.display = "block";
-				loginMessage.textContent = a;
-				if (b) {
-					document.getElementById("recoverForm")!.style.display = "none";
-				}
-			});
-		};
-	});
+	}
 	sock.on("dbClanCreateR", (a, d) => {
 		if (d) {
-			clanSignUp.style.display = "none";
-			clanStats.style.display = "block";
-			clanHeader.textContent = `[${a}] Clan:`;
-			clanAdminPanel.style.display = "block";
-			leaveClanButton.style.display = "inline-block";
-			leaveClanButton.textContent = "DELETE CLAN";
+			applyClanMembership(a, true);
+			st.messages.clanDB = "";
 		} else {
-			clanDBMessage.style.display = "block";
-			clanDBMessage.textContent = a;
+			st.messages.clanDB = a;
 		}
 	});
 	sock.on("dbClanJoinR", (a, d) => {
 		if (d) {
-			clanSignUp.style.display = "none";
-			clanStats.style.display = "block";
-			clanHeader.textContent = `[${a}] Clan:`;
-			st.player.account.clan = a;
-			const user = findUserByIndex(st.player.index);
-			if (user) {
-				user.account.clan = a;
-			}
-			leaveClanButton.style.display = "inline-block";
-			leaveClanButton.textContent = "Leave Clan";
+			applyClanMembership(a, false);
+			st.messages.clanDB = "";
 		} else {
-			clanDBMessage.style.display = "block";
-			clanDBMessage.textContent = a;
+			st.messages.clanDB = a;
 		}
 	});
 	sock.on("dbClanInvR", (a, _) => {
-		clanInvMessage.style.display = "block";
-		clanInvMessage.textContent = a;
+		st.messages.clanInv = a;
 	});
 	sock.on("dbKickInvR", (a, _) => {
-		clanInvMessage.style.display = "block";
-		clanInvMessage.textContent = a;
+		st.messages.clanInv = a;
 	});
 	sock.on("dbClanLevR", (a, d) => {
 		if (!d) return;
-		clanSignUp.style.display = "block";
-		clanStats.style.display = "none";
-		clanHeader.textContent = "Clans";
-		clanDBMessage.style.display = "block";
-		clanDBMessage.textContent = a;
-		leaveClanButton.style.display = "none";
+		applyClanMembership("", false);
+		st.clanData = {};
+		st.messages.clanDB = a;
 	});
 	sock.on("dbChatR", (a, d) => {
-		clanChtMessage.style.display = "inline-block";
-		clanChtMessage.textContent = a.text;
+		st.messages.clanCht = a.text;
 		if (!d) return;
-		if (!a.newURL.match(/^https?:\/\//i)) {
-			a.newURL = `http://${a.newURL}`;
-		}
-		st.clanData.chatUrl = a.newURL;
+		// the widget prefixes a bare host with https:// when it renders the link
+		st.clanData = { ...st.clanData, chatURL: a.newURL };
 	});
 	sock.on("dbChangeUserR", (a, d) => {
 		if (d) {
 			localStorage.setItem("userName", a);
 			st.player.account.username = a;
-			editProfileMessage.textContent = "Success. Account Updated.";
+			st.messages.editProfile = "Success. Account Updated.";
 		} else {
-			editProfileMessage.textContent = a;
+			st.messages.editProfile = a;
 		}
 	});
 	sock.on("dbClanStats", (clanData) => {
 		st.clanData = clanData;
 	});
-	sock.on("updAccStat", (account: Account) => {
-		updateAccountPage(account);
+	sock.on("updAccStat", applyAccount);
+	sock.on("questData", (data) => {
+		if (!data) return;
+		st.quests.daily = data.daily ?? [];
+		st.quests.weekly = data.weekly ?? null;
+		st.quests.streak = data.streak ?? { day: 0, claimed: false, rewardLabel: "" };
+		st.quests.dailyReset = data.dailyReset ?? "";
+		st.quests.weeklyReset = data.weeklyReset ?? "";
+	});
+	sock.on("questProgressUpdate", (snapshot) => {
+		if (!snapshot?.daily) return;
+		// merge live progress into local quest state
+		for (const live of snapshot.daily) {
+			const q = st.quests.daily.find((dq) => dq.questKey === live.questKey);
+			if (q) {
+				q.progress = live.progress;
+				q.claimable = live.claimable;
+			}
+		}
+	});
+	sock.on("questClaimResult", (result) => {
+		// quest data will be pushed by the server after a successful claim
+	});
+	sock.on("streakComplete", () => {
+		st.rewardPopup = { kind: "pendingCrates", count: st.unopenedCrateCount + 1 };
 	});
 	sock.on(
 		"gameSetup",
 		(setupJson: string, shouldSetupGameMap: boolean, shouldStartGame: boolean) => {
-			const setupData = JSON.parse(setupJson);
+			let setupData: any;
+			try {
+				setupData = JSON.parse(setupJson);
+			} catch {
+				console.error("gameSetup: malformed setup payload");
+				return;
+			}
 
 			if (shouldSetupGameMap) {
 				st.gameMap = setupData.mapData;
@@ -628,7 +914,11 @@ function setupSocket(sock: Socket) {
 				gameWidth = st.gameMap.width;
 				gameHeight = st.gameMap.height;
 				mapTileScale = setupData.tileScale;
-				st.players = setupData.usersInRoom;
+				// Merge rather than replace: gameSetup fires on every one of OUR respawns
+				// (respawn -> welcome -> gotit), and swapping in fresh server JSON threw
+				// away every remote player's interpolation buffer and animation phase, so
+				// each death anywhere in the room reset everyone's walk cycle.
+				st.players = mergeRoster(st.players, setupData.usersInRoom);
 				gameMode = st.gameMap.gameMode;
 				document.getElementById("gameModeText")!.textContent =
 					setupData.you.team === "blue" ? gameMode.desc2 : gameMode.desc1;
@@ -637,6 +927,12 @@ function setupSocket(sock: Socket) {
 				setupMap(st.gameMap, mapTileScale, flags);
 				cachedMiniMap = null;
 				deactivateSprays();
+				// The pool is rebuilt per round, and gameSetup runs on every respawn — so
+				// without this reset the array grew by 100 each time. That cost three
+				// extra full iterations per frame forever, and made findServerBullet
+				// return a stale duplicate serverIndex, which silently stopped remote
+				// players' shots from rendering at all.
+				bullets.length = 0;
 				for (let i = 0; i < 100; i++) {
 					const newBullet = new Projectile();
 					newBullet.serverIndex = i;
@@ -673,21 +969,73 @@ function setupSocket(sock: Socket) {
 			resize();
 		},
 	);
-	sock.on("lb", (data: number[]) => {
-		st.leaderboard = data;
-	});
+	sock.on("lb", updateLeaderboard);
 	sock.on("ts", updateTeamScores);
 	sock.on("rsd", receiveServerData);
+	// last-applied input number for THIS socket only — the roster is one shared
+	// packet now, so the per-recipient value arrives on its own event
+	sock.on("isn", (n: number) => {
+		const me = findUserByIndex(st.player.index);
+		if (me) me.isn = n;
+	});
 	sock.on("upd", updateUserValue);
 	sock.on("vt", updateVoteStats);
+	// live "who is playing" for the social hub. The lobby socket receives a
+	// snapshot on connect and a fresh list whenever someone joins, leaves, or a
+	// room rotates mode.
+	sock.on("presence", (list: typeof st.presence) => {
+		st.presence = Array.isArray(list) ? list : [];
+	});
 	sock.on("add", addUser);
 	sock.on("updHt", (_len: number, data: Hat[]) => (st.cosmetics.hats = data));
 	sock.on("updShrt", (_len: number, data: Shirt[]) => (st.cosmetics.shirts = data));
-	sock.on("updCmo", (_len: number, data: Camo[][]) => (st.cosmetics.camos = data));
+	sock.on("updCmo", (_len: number, data: Camo[] | Camo[][]) => {
+		// The server now sends the catalogue once instead of one identical copy per
+		// weapon; tolerate the old nested shape so a mid-deploy client still works.
+		st.cosmetics.camos = Array.isArray(data[0])
+			? (data as Camo[][])
+			: [data as Camo[]];
+	});
+	sock.on(
+		"updUnlocks",
+		(
+			data: {
+				hat: { id: number; serial: number }[];
+				shirt: { id: number; serial: number }[];
+				camo: { id: number; serial: number }[];
+				spray?: { id: number; serial: number }[];
+			},
+		) => {
+			const serials = new Map<string, number>();
+			const apply = (t: "hat" | "shirt" | "camo" | "spray", rows: { id: number; serial: number }[]) => {
+				st.unlockedItems[t] = new Set(rows.map((r) => r.id));
+				for (const r of rows) serials.set(`${t}:${r.id}`, r.serial);
+			};
+			apply("hat", data.hat ?? []);
+			apply("shirt", data.shirt ?? []);
+			apply("camo", data.camo ?? []);
+			apply("spray", data.spray ?? []);
+			st.unlockSerials = serials;
+		},
+	);
+	sock.on("unlockReveal", (items: { name: string; chance: number; serial?: number }[]) => {
+		if (items.length > 0) st.rewardPopup = { kind: "unlocks", items };
+	});
+	sock.on("rankUp", (rank: number) => {
+		st.rewardPopup = { kind: "rankUp", rank };
+	});
+	sock.on("crateResult", (data: { error?: string; won?: CrateWonItem | null; remaining?: number }) => {
+		if (data.error) return;
+		st.unopenedCrateCount = data.remaining ?? st.unopenedCrateCount;
+		st.rewardPopup = { kind: "crateOpen", won: data.won ?? null };
+	});
 	sock.on("crtSpr", createSpray);
 	sock.on("rem", removeUser);
 	sock.on("cht", messageFromServer);
 	sock.on("kick", (reason: string) => {
+		// a kick can arrive mid-join (e.g. "Room is full."); clear the joining
+		// flag so kickPlayer isn't suppressed and the menu doesn't lock up
+		st.changingLobby = false;
 		kickPlayer(reason);
 	});
 	sock.on("1", (healthUpdate) => {
@@ -714,7 +1062,7 @@ function setupSocket(sock: Socket) {
 		if (healthUpdate.bulletIndex !== null) {
 			let serverBullet = findServerBullet(healthUpdate.bulletIndex);
 			if (serverBullet && serverBullet.owner?.index !== st.player.index) {
-				if (player.onScreen && healthDelta < 0 && serverBullet.spriteIndex !== 2) {
+				if (player?.onScreen && healthDelta < 0 && serverBullet.spriteIndex !== 2) {
 					particleCone(
 						12,
 						player.x,
@@ -763,8 +1111,17 @@ function setupSocket(sock: Socket) {
 		}
 	});
 	sock.on("3", (event) => {
-		var destPlayer = findUserByIndex(event.gID);
-		var sourcePlayer = findUserByIndex(event.dID);
+		const destPlayer = findUserByIndex(event.gID);
+		const sourcePlayer = findUserByIndex(event.dID);
+		// A kill can reference a player this client has not added yet (a missed
+		// "add", or a kill landing during the join handshake). Everything below
+		// dereferences both, so bail rather than throw out of the socket handler —
+		// which used to abort the rest of the event, leaving the victim alive.
+		if (!destPlayer || !sourcePlayer) {
+			if (destPlayer) destPlayer.dead = true;
+			sock.emit("ftc", destPlayer ? event.dID : event.gID);
+			return;
+		}
 		destPlayer.dead = true;
 		if (event.kB && event.gID !== st.player.index) {
 			if (event.dID === st.player.index) {
@@ -827,7 +1184,7 @@ function setupSocket(sock: Socket) {
 			st.player.dead = true;
 			window.setTimeout(() => {
 				if (!st.gameOver) {
-					document.getElementById("startMenuWrapper")!.style.display = "block";
+					document.getElementById("startMenuWrapper")!.style.display = "flex";
 					document.getElementById("linkBoxRight")!.style.display = "block";
 				}
 			}, 1300);
@@ -873,8 +1230,9 @@ function setupSocket(sock: Socket) {
 				1.3,
 			);
 		} else {
-			//@ts-expect-error TODO
-			createSmokePuff(zoneEvent.oldX, zoneEvent.oldY, 5, false, 1);
+			if (zoneEvent.oldX !== undefined && zoneEvent.oldY !== undefined) {
+				createSmokePuff(zoneEvent.oldX, zoneEvent.oldY, 5, false, 1);
+			}
 			showNotification(`${user.name} scored`);
 		}
 	});
@@ -902,36 +1260,33 @@ function setupSocket(sock: Socket) {
 		startSoundTrack(1);
 	});
 	sock.on("8", (timeLeft: number) => {
-		document.getElementById("nextGameTimer")!.textContent = `${timeLeft}: UNTIL NEXT ROUND`;
+		st.gameOverPanel.timerText = `${timeLeft}: UNTIL NEXT ROUND`;
 	});
 }
 
 function setupInitialSocket(sock: Socket) {
-	sock.once("connect", () => {
-		let logKey = localStorage.getItem("logKey");
-		let userName = localStorage.getItem("userName");
-		if (logKey && userName) {
-			sock.emit("dbLogin", {
-				lgKey: logKey,
-				userName: userName,
-				userPass: false,
-			});
-			loginMessage.style.display = "block";
-			loginMessage.textContent = "Logging in...";
-		}
-	});
+	// Session cookie handles reconnection automatically via server middleware.
+	// The server validates the cookie and emits updAccStat if valid.
+	// No client-side reconnection logic needed.
 }
 
-function updateVoteStats(a: any) {
-	document.getElementById(`votesText${a.i}`)!.textContent = `${a.n}: ${a.v}`;
+function updateVoteStats(a: { i: number; n: string; v: number }) {
+	// Room.configure() can shrink modeVotes underneath us, and this arrives for
+	// clients that have never opened the stat table — so an out-of-range index is
+	// normal, not an error. (It used to non-null-assert a DOM lookup and throw.)
+	const vote = st.gameOverPanel.modeVotes[a.i];
+	if (vote) {
+		vote.name = a.n;
+		vote.votes = a.v;
+	}
 }
 function showESCMenu() {
 	deactiveAllAnimTexts();
 	st.startingGame = false;
 	inMainMenu = true;
 	hideUI(false);
-	document.getElementById("startMenuWrapper")!.style.display = "block";
-	document.getElementById("gameStatWrapper")!.style.display = "none";
+	document.getElementById("startMenuWrapper")!.style.display = "flex";
+	st.gameOverPanel.visible = false;
 }
 
 function showStatTable(
@@ -943,9 +1298,10 @@ function showStatTable(
 	hideUI(false);
 
 	if (reset) {
-		document.getElementById("nextGameTimer")!.textContent = "GAME STATS";
-		document.getElementById("winningTeamText")!.textContent = "";
-		document.getElementById("voteModeContainer")!.textContent = "";
+		st.gameOverPanel.timerText = "GAME STATS";
+		st.gameOverPanel.winnerText = "";
+		st.gameOverPanel.modeVotes = [];
+		st.gameOverPanel.myVote = null;
 	} else {
 		let isWinner = st.player.team === winner || st.player.id === winner;
 		if (!isFading) {
@@ -960,37 +1316,24 @@ function showStatTable(
 					false,
 					2,
 				);
-				document.getElementById("winningTeamText")!.textContent = "VICTORY";
-				document.getElementById("winningTeamText")!.style.color = TeamColors.Blue;
+				st.gameOverPanel.winnerText = "VICTORY";
+				st.gameOverPanel.winnerColor = TeamColors.Blue;
 			} else if (st.player.team.length) {
 				startBigAnimText("Defeat", "Bad Luck!", 2500, true, TeamColors.Red, "#ffffff", false, 2);
-				document.getElementById("winningTeamText")!.textContent = "DEFEAT";
-				document.getElementById("winningTeamText")!.style.color = TeamColors.Red;
+				st.gameOverPanel.winnerText = "DEFEAT";
+				st.gameOverPanel.winnerColor = TeamColors.Red;
 			}
 		}
 		if (modeVoteData != null) {
-			document.getElementById("voteModeContainer")!.textContent = "";
-			for (let i = 0; i < modeVoteData.length; ++i) {
-				let modeVoteBtn = document.createElement("button");
-				modeVoteBtn.className = "modeVoteButton";
-				modeVoteBtn.setAttribute("id", `votesText${i}`);
-				modeVoteBtn.textContent = `${modeVoteData[i].name}: ${modeVoteData[i].votes}`;
-				document.getElementById("voteModeContainer")!.appendChild(modeVoteBtn);
-				modeVoteBtn.onclick = () => {
-					mainCanvas.focus();
-					socket.emit("modeVote", i);
-					for (let j = 0; j < modeVoteData.length; ++j) {
-						if (
-							i === j &&
-							document.getElementById(`votesText${j}`)!.className === "modeVoteButton"
-						) {
-							document.getElementById(`votesText${j}`)!.className = "modeVoteButtonA";
-						} else {
-							document.getElementById(`votesText${j}`)!.className = "modeVoteButton";
-						}
-					}
-				};
-			}
+			// GameStatsTable renders these; the click handler and the selected-state
+			// swap live there too, instead of createElement plus className strings.
+			st.gameOverPanel.modeVotes = modeVoteData.map(
+				(vote: { name: string; votes: number }) => ({
+					name: vote.name,
+					votes: vote.votes,
+				}),
+			);
+			st.gameOverPanel.myVote = null;
 		}
 	}
 
@@ -999,7 +1342,7 @@ function showStatTable(
 		animateOverlay = false;
 		gameOverFade = true;
 		deactiveAllAnimTexts();
-		document.getElementById("gameStatWrapper")!.style.display = "block";
+		st.gameOverPanel.visible = true;
 	} else {
 		hideStatTable();
 		hideUI(false);
@@ -1008,7 +1351,7 @@ function showStatTable(
 			gameOverFade = true;
 		}, 2500);
 		window.setTimeout(() => {
-			document.getElementById("gameStatWrapper")!.style.display = "block";
+			st.gameOverPanel.visible = true;
 		}, 4500);
 	}
 }
@@ -1018,18 +1361,62 @@ function hideStatTable() {
 	showingScoreBoard = false;
 	animateOverlay = true;
 	drawOverlay(graph, false, true);
-	document.getElementById("gameStatWrapper")!.style.display = "none";
+	st.gameOverPanel.visible = false;
 	document.getElementById("linkBoxRight")!.style.display = "none";
 }
 
+/**
+ * Client-only per-player state that the server knows nothing about, and that
+ * must survive a roster refresh. Losing it is what made every respawn in the
+ * room reset everyone's animation and interpolation.
+ */
+function carryClientState(from: Player, to: Player): Player {
+	to.netBuffer = from.netBuffer;
+	to.xSpeed = from.xSpeed ?? 0;
+	to.ySpeed = from.ySpeed ?? 0;
+	to.idleFor = from.idleFor ?? 0;
+	to.animIndex = from.animIndex;
+	to.frameCountdown = from.frameCountdown;
+	to.hitFlash = from.hitFlash;
+	to.nameYOffset = from.nameYOffset;
+	return to;
+}
+
+/** Applies a fresh server roster while preserving client-only render state. */
+function mergeRoster(existing: Player[], incoming: Player[]): Player[] {
+	const byIndex = new Map(existing.map((pl) => [pl.index, pl]));
+	return incoming.map((pl) => {
+		const previous = byIndex.get(pl.index);
+		return previous ? carryClientState(previous, pl) : seedClientState(pl);
+	});
+}
+
+/** Initialises client-only state on a player we're seeing for the first time. */
+function seedClientState(plr: Player): Player {
+	// undefined here meant `Math.abs(undefined) + Math.abs(undefined)` was NaN,
+	// and `NaN > 0` is false — so a newly-received player went straight to the
+	// idle sprite and stayed there
+	plr.xSpeed = 0;
+	plr.ySpeed = 0;
+	plr.idleFor = 0;
+	plr.netBuffer = [];
+	return plr;
+}
+
 function addUser(userString: string) {
-	let parsed = JSON.parse(userString);
+	let parsed: Player;
+	try {
+		parsed = JSON.parse(userString);
+	} catch {
+		return;
+	}
 	if (parsed.index !== st.player.index) {
 		const existingUser = findUserByIndex(parsed.index);
 		if (existingUser == null) {
-			st.players.push(parsed);
+			st.players.push(seedClientState(parsed));
 		} else {
-			st.players[st.players.indexOf(existingUser)] = parsed;
+			// the server re-emits "add" on every respawn, not just on join
+			st.players[st.players.indexOf(existingUser)] = carryClientState(existingUser, parsed);
 		}
 	}
 }
@@ -1074,6 +1461,12 @@ function updateUserValue(data: any) {
 	if (data.goa !== undefined) {
 		tmpUser.totalGoals = data.goa;
 	}
+	if (data.li !== undefined) {
+		tmpUser.lastItem = data.li;
+	}
+	if (data.rnk !== undefined) {
+		tmpUser.account.rank = data.rnk;
+	}
 	if (tmpUser.index === st.player.index) {
 		updatePlayerInfo(tmpUser);
 	}
@@ -1081,16 +1474,106 @@ function updateUserValue(data: any) {
 function fetchUserWithIndex(index: number) {
 	socket.emit("ftc", index);
 }
+// How far behind the newest snapshot remote players are rendered. One server
+// tick is 16ms, so this absorbs roughly six late or dropped packets before the
+// buffer runs dry and we have to extrapolate.
+const REMOTE_INTERP_DELAY_MS = 100;
+// Rendered speed (px/ms) below which a remote player counts as standing still.
+// Well under a walk (~0.3 px/ms) but above interpolation and rounding noise.
+const REMOTE_MOVING_THRESHOLD = 0.01;
+// How long a player must be still before the walk cycle drops to the idle frame.
+const ANIM_IDLE_GRACE_MS = 120;
+// Never extrapolate further than this past the newest snapshot; beyond it we
+// hold the last known position rather than inventing motion.
+const REMOTE_EXTRAPOLATE_MAX_MS = 150;
+// Samples older than the render time by more than this are dropped.
+const REMOTE_BUFFER_KEEP_MS = 500;
+
+/** Records one server position sample for a remote player. */
+function pushRemoteSnapshot(plr: Player, packetLength: number, data: number[], cursor: number) {
+	const buffer = (plr.netBuffer ??= []);
+	const previous = buffer[buffer.length - 1];
+	const snapshot: NetSnapshot = {
+		t: performance.now(),
+		x: packetLength > 2 ? data[2 + cursor] : (previous?.x ?? plr.x),
+		y: packetLength > 3 ? data[3 + cursor] : (previous?.y ?? plr.y),
+		angle: packetLength > 4 ? data[4 + cursor] : (previous?.angle ?? plr.angle),
+		// slot 5 used to be nameYOffset, which the server always sent as 0; it now
+		// carries jumpY, without which remote jumps never rendered at all
+		jumpY: packetLength > 5 ? data[5 + cursor] : (previous?.jumpY ?? 0),
+	};
+	buffer.push(snapshot);
+	// a player we have no history for (just spawned, or a long gap in packets)
+	// should appear where the server says, not slide in from wherever they were
+	// last seen
+	if (buffer.length === 1) {
+		plr.x = snapshot.x;
+		plr.y = snapshot.y;
+		plr.angle = snapshot.angle;
+		plr.jumpY = snapshot.jumpY;
+	}
+	if (buffer.length > 32) buffer.splice(0, buffer.length - 32);
+}
+
+/**
+ * Advances every remote player to their interpolated position for this frame.
+ *
+ * Runs once per rendered frame, before drawing. Rendered speed is measured from
+ * the movement this produces, so the walk cycle is driven by motion the player
+ * can actually see rather than by whether a packet happened to arrive.
+ */
+function updateRemoteInterpolation(frameDelta: number) {
+	const renderTime = performance.now() - REMOTE_INTERP_DELAY_MS;
+	for (const plr of st.players) {
+		if (plr.index === st.player.index) continue;
+		const buffer = plr.netBuffer;
+		if (!buffer || buffer.length === 0) {
+			plr.xSpeed = 0;
+			plr.ySpeed = 0;
+			continue;
+		}
+		const previousX = plr.x;
+		const previousY = plr.y;
+
+		const pose = sampleSnapshots(buffer, renderTime, REMOTE_EXTRAPOLATE_MAX_MS);
+		if (pose) {
+			plr.x = pose.x;
+			plr.y = pose.y;
+			plr.jumpY = pose.jumpY;
+			plr.angle = pose.angle;
+		}
+
+		// Rendered speed in px/ms. This is what the walk cycle reads, and it is
+		// non-zero on every frame the player visibly moves — the old per-packet
+		// delta was zero on most frames, which pinned remotes to the idle sprite.
+		if (frameDelta > 0) {
+			plr.xSpeed = Math.abs(plr.x - previousX) / frameDelta;
+			plr.ySpeed = Math.abs(plr.y - previousY) / frameDelta;
+		}
+
+		const currentWeapon = getCurrentWeapon(plr);
+		if (currentWeapon) {
+			currentWeapon.front = isWeaponFacingFront(snapAngleToCardinal(plr.angle));
+		}
+
+		pruneSnapshots(buffer, renderTime, REMOTE_BUFFER_KEEP_MS);
+	}
+}
+
 function receiveServerData(data: number[]) {
 	if (!st.gameOver) {
+		const byIndex = new Map<number, Player>();
 		st.players.forEach((obj) => {
 			obj.onScreen = false;
+			byIndex.set(obj.index, obj);
 		});
 		for (let cursor = 0; cursor < data.length; ) {
 			const packetLength = data[0 + cursor];
 			const playerIndex = data[1 + cursor];
-			const tmpUser = findUserByIndex(playerIndex);
+			const tmpUser = byIndex.get(playerIndex) ?? null;
 			if (playerIndex === st.player.index && tmpUser != null) {
+				// the local player is predicted and reconciled below, so the server's
+				// position is authoritative and applied directly
 				if (packetLength > 2) {
 					tmpUser.x = data[2 + cursor];
 				}
@@ -1100,29 +1583,16 @@ function receiveServerData(data: number[]) {
 				if (packetLength > 4) {
 					tmpUser.angle = data[4 + cursor];
 				}
-				if (packetLength > 5) {
-					tmpUser.isn = data[5 + cursor];
-				}
+				// slot 5 is jumpY (our own jump is predicted locally, so it's ignored
+				// here); the last-applied input number now arrives on the "isn" event
 				tmpUser.onScreen = true;
 			} else if (tmpUser != null) {
-				if (packetLength > 2) {
-					tmpUser.xSpeed = Math.abs(tmpUser.x - data[2 + cursor]);
-					tmpUser.x = data[2 + cursor];
-				}
-				if (packetLength > 3) {
-					tmpUser.ySpeed = Math.abs(tmpUser.y - data[3 + cursor]);
-					tmpUser.y = data[3 + cursor];
-				}
-				if (packetLength > 4) {
-					tmpUser.angle = data[4 + cursor];
-				}
-				const currentWeapon = getCurrentWeapon(tmpUser);
-				if (currentWeapon) {
-					currentWeapon.front = isWeaponFacingFront(snapAngleToCardinal(tmpUser.angle));
-				}
-				if (packetLength > 5) {
-					tmpUser.nameYOffset = data[5 + cursor];
-				}
+				// Remote players are buffered, never snapped. Assigning x/y straight
+				// from the packet is what made them teleport: they moved only when a
+				// packet landed, while the local player moved every frame.
+				// updateRemoteInterpolation replays this buffer smoothly, one render
+				// delay behind.
+				pushRemoteSnapshot(tmpUser, packetLength, data, cursor);
 				tmpUser.onScreen = true;
 			} else {
 				fetchUserWithIndex(playerIndex);
@@ -1134,6 +1604,8 @@ function receiveServerData(data: number[]) {
 		if (plr.index !== st.player.index) continue;
 		if (plr.dead || st.gameOver || thisInput.length > 80) {
 			thisInput = [];
+			// drop the un-sent packet too, or it replays against a fresh spawn
+			pendingInput = null;
 		}
 		if (plr.dead) continue;
 		let inputCursor = 0;
@@ -1156,7 +1628,7 @@ function receiveServerData(data: number[]) {
 			plr.oldY = plr.y;
 			plr.x += horizontalDelta * plr.speed * thisInput[inputCursor].delta;
 			plr.y += verticalDelta * plr.speed * thisInput[inputCursor].delta;
-			wallCol(plr, st.gameMap.tiles, clutter);
+			wallCol(plr, st.gameMap, clutter);
 			inputCursor++;
 		}
 		plr.x = Math.round(plr.x);
@@ -1178,24 +1650,46 @@ function findUserByIndex(index: number): Player {
 	return st.players.find((obj) => obj.index === index) ?? null!;
 }
 
-function sortUsersByPosition(a: Player, b: Player) {
-	if (a.y < b.y) {
-		return -1;
-	} else if (a.y > b.y) {
-		return 1;
-	} else {
-		return 0;
-	}
-}
 
+function updateLeaderboard(data: number[]) {
+	// The server builds this list from players who have taken a spawn this round
+	// (Room.broadcastLeaderboard filters on firstReceive), so it doubles as the
+	// authoritative "who has actually played" set for the end-of-round scoreboard.
+	st.spawnedIndexes = data.slice();
+
+	let test: Node[] = [];
+	test.push(<span class="title">LEADERBOARD</span>);
+
+	for (let i = 0; i < data.length; i++) {
+		let tmpPlayer = findUserByIndex(data[0 + i]);
+		if (tmpPlayer == null) continue;
+		test.push(<br />);
+		if (tmpPlayer.index === st.player.index) {
+			test.push(
+				<span class="me">
+					{i + 1}. {st.player.name}
+					{st.player.account.clan && ` [${st.player.account.clan}]`}
+				</span>,
+			);
+		} else if (tmpPlayer.name) {
+			test.push(
+				<>
+					<span class={tmpPlayer.team !== st.player.team ? "red" : "blue"}>
+						{i + 1}. {tmpPlayer.name}
+					</span>
+					{tmpPlayer.account.clan && <span class="me"> [{tmpPlayer.account.clan}]</span>}
+				</>,
+			);
+		}
+	}
+	document.getElementById("status")!.replaceChildren(...test);
+}
 function updateTeamScores(scoreRed: number, scoreBlue: number) {
 	var redProgress = document.getElementById("redProgress")!;
 	var blueText = document.getElementById("blueText")!;
 	var blueProgress = document.getElementById("blueProgress")!;
 	var redProgCont = document.getElementById("redProgCont")!;
 	if (!gameMode) return;
-	scoreRed /= gameMode.score / 100;
-	scoreBlue /= gameMode.score / 100;
 	if (gameMode.teams) {
 		blueText.textContent = "A";
 		redProgCont.style.display = "";
@@ -1211,9 +1705,10 @@ function updateTeamScores(scoreRed: number, scoreBlue: number) {
 			blueProgress.style.width = `${scoreBlue}%`;
 		}
 	} else {
-		const scorePlayer = (st.player.score / gameMode.score) * 100;
-		blueProgress.setAttribute("style", `display:block;width:${scorePlayer}%`);
-		blueProgress.style.width = `${scorePlayer}%`;
+		//scoreBlue = Math.round((st.player.score / scoreRed) * 100);
+		scoreBlue = (st.player.score / gameMode.score) * 100;
+		blueProgress.setAttribute("style", `display:block;width:${scoreBlue}%`);
+		blueProgress.style.width = `${scoreBlue}%`;
 		blueText.textContent = "YOU";
 		redProgCont.style.display = "none";
 	}
@@ -1237,7 +1732,6 @@ function showUI() {
 	}
 }
 function hideMenuUI() {
-	document.getElementById("linkBoxLeft")!.style.display = "none";
 	document.getElementById("linkBoxRight")!.style.display = "none";
 }
 function hideUI(hideChatbox: boolean) {
@@ -1263,7 +1757,7 @@ let currentFPS = 0;
 let fpsUpdateDelta = 0;
 let fpsSamples: number[] = [];
 function updateGameLoop() {
-	delta = currentTime - oldTime;
+	delta = Math.min(MAX_FRAME_DELTA_MS, Math.max(0, currentTime - oldTime));
 
 	currentFPS = delta ? 1000 / delta : 0;
 	fpsSamples.push(currentFPS);
@@ -1271,7 +1765,7 @@ function updateGameLoop() {
 	fpsUpdateDelta += delta;
 	if (fpsUpdateDelta >= 1000) {
 		const average = fpsSamples.reduce((a, b) => a + b) / fpsSamples.length;
-		st.fps = Math.round(average);
+		document.getElementById("fpsText")!.textContent = `FPS ${Math.round(average)}`;
 		fpsUpdateDelta = 0;
 		fpsSamples = [];
 	}
@@ -1291,8 +1785,12 @@ function updateGameLoop() {
 	if (keys.l) {
 		horizontalDT = -1;
 	}
-	if (keys.s) {
-		doJump = 0;
+
+	// virtual stick (TouchControls) feeds analog axes straight in; clampMovementInput
+	// on the server already accepts any float in [-1, 1] here
+	if (touchMove.active) {
+		horizontalDT = touchMove.x;
+		verticalDT = touchMove.y;
 	}
 	var b = horizontalDT;
 	var d = verticalDT;
@@ -1301,6 +1799,10 @@ function updateGameLoop() {
 		b /= e;
 		d /= e;
 	}
+	// Remote players are advanced along their snapshot buffer before anything
+	// reads their position this frame — the walk cycle below measures the motion
+	// this produces.
+	updateRemoteInterpolation(delta);
 	const clientPrediction = true;
 	if (clientPrediction) {
 		for (const plr of st.players) {
@@ -1311,7 +1813,7 @@ function updateGameLoop() {
 					plr.x += b * plr.speed * delta;
 					plr.y += d * plr.speed * delta;
 				}
-				wallCol(plr, st.gameMap.tiles, clutter);
+				wallCol(plr, st.gameMap, clutter);
 				plr.x = Math.round(plr.x);
 				plr.y = Math.round(plr.y);
 				plr.angle = ((target.f + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI) + 90;
@@ -1340,17 +1842,7 @@ function updateGameLoop() {
 				plr.jumpY = Math.round(plr.jumpY);
 			}
 			if (plr.index === st.player.index && !st.gameOver) {
-				let sendData = {
-					hdt: b,
-					vdt: d,
-					ts: currentTime,
-					isn: inputNumber,
-					s: doJump,
-					delta,
-				};
-				inputNumber++;
-				thisInput.push(sendData);
-				socket.emit("4", sendData);
+				queueMovementInput(b, d, doJump, delta, currentTime);
 				if (userScroll !== 0 && !st.gameOver) {
 					playerSwapWeapon(plr, userScroll);
 					userScroll = 0;
@@ -1360,19 +1852,43 @@ function updateGameLoop() {
 				}
 				if (keys.lm && !st.gameOver && st.player.weapons.length > 0) {
 					const weapon = getCurrentWeapon(plr);
-					if (weapon && currentTime - weapon.lastShot >= weapon.fireRate) {
+					// The second condition mirrors the server's cross-weapon gate:
+					// each weapon keeps its own lastShot, so without it, switching
+					// weapons reset the cooldown and both fired at full rate. The
+					// swap above happens in this same frame, which is what made it
+					// so easy to do by accident on the scroll wheel.
+					if (
+						weapon &&
+						currentTime - weapon.lastShot >= weapon.fireRate &&
+						currentTime >= nextLocalShotAt
+					) {
 						shootBullet(plr);
 					}
 				}
 			}
 			if (st.gameOver) {
 				plr.animIndex = 0;
+				plr.idleFor = 0;
 			} else {
-				let movementDelta = Math.abs(b) + Math.abs(d);
-				if (plr.index !== st.player.index) {
-					movementDelta = Math.abs(plr.xSpeed!) + Math.abs(plr.ySpeed!);
+				// Local player: read the live key state. Remote players: read the
+				// rendered speed produced by updateRemoteInterpolation, in px/ms.
+				let isMoving: boolean;
+				if (plr.index === st.player.index) {
+					isMoving = Math.abs(b) + Math.abs(d) > 0;
+				} else {
+					isMoving = (plr.xSpeed ?? 0) + (plr.ySpeed ?? 0) > REMOTE_MOVING_THRESHOLD;
 				}
-				if (movementDelta > 0) {
+				// Hysteresis. Advancing one walk frame needs 160ms of motion
+				// (frameCountdown 40, decremented by delta/4), so dropping straight to
+				// the idle frame on a single still sample meant the cycle was reset
+				// before it ever reached frame 1 — which is why remote players never
+				// appeared to animate. Require a sustained stop instead.
+				if (isMoving) {
+					plr.idleFor = 0;
+				} else {
+					plr.idleFor = (plr.idleFor ?? 0) + delta;
+				}
+				if (isMoving || (plr.idleFor ?? 0) < ANIM_IDLE_GRACE_MS) {
 					plr.frameCountdown -= delta / 4;
 					if (plr.frameCountdown <= 0) {
 						plr.animIndex++;
@@ -1388,6 +1904,9 @@ function updateGameLoop() {
 					}
 				} else if (plr.animIndex !== 0) {
 					plr.animIndex = 0;
+					// reset the phase too, or the residual countdown makes the next
+					// step land at an arbitrary point in the cycle
+					plr.frameCountdown = 40;
 				}
 				if (plr.jumpY > 0) {
 					plr.animIndex = 1;
@@ -1395,7 +1914,11 @@ function updateGameLoop() {
 			}
 		}
 	}
-	st.players.sort(sortUsersByPosition);
+	// (st.players used to be y-sorted in place here every frame. It is a $state
+	// proxy, so the sort's writes invalidated every effect reading it —
+	// GameStatsTable's $derived.by and the HUD bindings — 60-240 times a second.
+	// Nothing depended on the order: getGameObjectRenderData sorts its own render
+	// list by y anyway, and the scoreboard re-sorts by score.)
 	if (!st.kicked) {
 		if (st.gameOver) {
 			doGame(delta);
@@ -1408,7 +1931,7 @@ function updateGameLoop() {
 		} else if (st.gameStart) {
 			doGame(delta);
 			drawOverlay(graph, false, true);
-			if (!st.mobile && targetChanged) {
+			if (targetChanged) {
 				targetChanged = false;
 				socket.emit("0", target.f);
 			}
@@ -1495,17 +2018,15 @@ function doGame(delta: number) {
 			-st.shake.y +
 			target.dOffset * Math.sin(target.f + Math.PI);
 
-		if (fillCounter > 1 && socket) {
-			socket.emit("kil");
-		}
 	}
 	drawBackground();
 	drawMap(0);
+	updateBulletsAndDrawTrails(delta);
 	drawMap(1);
 	drawSprays();
 	updateParticles(delta, 0);
 	drawGameObjects(delta);
-	updateBullets(delta);
+	drawBullets();
 	updateParticles(delta, 1);
 	drawMap(2);
 	drawPlayerNames();
@@ -1516,7 +2037,6 @@ function doGame(delta: number) {
 	drawUI();
 	drawMiniMapCounter--;
 	if (drawMiniMapCounter <= 0 && st.gameStart) {
-		fillCounter = 0;
 		drawMiniMapCounter = drawMiniMapFPS;
 		drawMiniMap();
 	}
@@ -1535,8 +2055,7 @@ function resize() {
 		(window.innerWidth - st.maxScreenWidth * a) / 2,
 		(window.innerHeight - st.maxScreenHeight * a) / 2,
 	);
-	document.getElementById("startMenuWrapper")!.style.transform =
-		`perspective(1px) translate(-50%, -50%) scale(${uiScale})`;
+	// startMenuWrapper is a responsive full-screen flex overlay now — no JS scaling
 	document.getElementById("gameStatWrapper")!.style.transform =
 		`perspective(1px) translate(-50%, -50%) scale(${uiScale})`;
 	graph.imageSmoothingEnabled = false;
@@ -1566,31 +2085,31 @@ function drawGameLights(delta: number) {
 	if (!st.sprites.light || !graph) return;
 	graph.globalCompositeOperation = "lighter";
 	graph.globalAlpha = 0.2;
-	for (const tmpObject of bullets) {
-		if (!st.settings.showGlows || tmpObject.spriteIndex === 2 || !tmpObject.active) continue;
-		let tmpBulletGlowWidth = tmpObject.glowWidth || Math.min(200, tmpObject.width * 14);
-		let tmpBulletGlowHeight = tmpObject.glowHeight || tmpObject.height * 2.5;
-		let lightX = tmpObject.x - st.startX;
-		let lightY = tmpObject.y - st.startY;
-		if (!canSee(lightX, lightY, tmpBulletGlowWidth, tmpBulletGlowHeight)) continue;
-		graph.save();
-		graph.translate(lightX, lightY);
-		drawSprite(
-			graph,
-			st.sprites.light,
-			-(tmpBulletGlowWidth / 2),
-			-(tmpBulletGlowHeight / 2) + tmpObject.height / 2,
-			tmpBulletGlowWidth,
-			tmpBulletGlowHeight,
-			tmpObject.dir - Math.PI / 2,
-			false,
-			0,
-			0,
-			0,
-		);
-		graph.restore();
-	}
 	if (st.settings.showGlows) {
+		for (const tmpObject of bullets) {
+			if (!tmpObject.active || tmpObject.spriteIndex === 2) continue;
+			let tmpBulletGlowWidth = tmpObject.glowWidth || Math.min(200, tmpObject.width * 14);
+			let tmpBulletGlowHeight = tmpObject.glowHeight || tmpObject.height * 2.5;
+			let lightX = tmpObject.x - st.startX;
+			let lightY = tmpObject.y - st.startY;
+			if (!canSee(lightX, lightY, tmpBulletGlowWidth, tmpBulletGlowHeight)) continue;
+			graph.save();
+			graph.translate(lightX, lightY);
+			drawSprite(
+				graph,
+				st.sprites.light,
+				-(tmpBulletGlowWidth / 2),
+				-(tmpBulletGlowHeight / 2) + tmpObject.height / 2,
+				tmpBulletGlowWidth,
+				tmpBulletGlowHeight,
+				tmpObject.dir - Math.PI / 2,
+				false,
+				0,
+				0,
+				0,
+			);
+			graph.restore();
+		}
 		graph.globalAlpha = 0.2;
 		updateFlashGlows(delta);
 	}
@@ -1602,7 +2121,6 @@ mapContext.lineWidth = pingScale / 2;
 
 var cachedMiniMap: HTMLCanvasElement | null = null;
 function getCachedMiniMap() {
-	fillCounter++;
 	if (cachedMiniMap == null && st.gameMap?.tiles.length > 0) {
 		let baseCanvasElem = document.createElement("canvas");
 		let baseCtx = baseCanvasElem.getContext("2d")!;
@@ -1811,7 +2329,14 @@ function playerSwapWeapon(tmpPlayer: Player, change: number) {
 	socket.emit("sw", tmpPlayer.currentWeapon);
 }
 function playerEquipWeapon(tmpPlayer: Player, weaponId: number) {
+	const previousWeapon = tmpPlayer.currentWeapon;
+	if (previousWeapon !== weaponId) {
+		window.resetCooldownAnimation?.(previousWeapon);
+		window.setCooldownAnimation?.(previousWeapon, 0, false);
+	}
 	tmpPlayer.currentWeapon = weaponId;
+	window.resetCooldownAnimation?.(weaponId);
+	window.setCooldownAnimation?.(weaponId, 0, false);
 }
 function shootBullet(source: Player) {
 	const sourceWep = getCurrentWeapon(source);
@@ -1854,6 +2379,8 @@ function shootBullet(source: Player) {
 	}
 	socket.emit("1", source.x, source.y, source.jumpY, target.f, target.d, currentTime);
 	sourceWep.lastShot = currentTime;
+	// carries the cooldown across a weapon switch, matching Room.consumeShot
+	nextLocalShotAt = currentTime + sourceWep.fireRate;
 	sourceWep.ammo--;
 	if (sourceWep.ammo <= 0) {
 		playerReload(source, true);
@@ -1883,66 +2410,94 @@ function someoneShot(evt: ShootEvent) {
 		}
 	}
 }
-function updateBullets(delta: number) {
+var trailGradient: CanvasGradient | null = null;
+// runs the bullet physics step and draws the trails; called early in the frame
+// (before the wall front faces in drawMap(1)) so trails crossing behind a wall
+// are occluded by it instead of drawing on top of the wall face
+function updateBulletsAndDrawTrails(delta: number) {
 	graph.globalAlpha = 1;
 	for (const bullet of bullets) {
-		bullet.update(delta, currentTime, clutter, st.gameMap.tiles, st.players);
-		if (bullet.active) {
-			const screenX = bullet.x - st.startX;
-			const screenY = bullet.y - st.startY;
-			if (canSee(screenX, screenY, bullet.height, bullet.height)) {
-				graph.save();
-				graph.translate(screenX, screenY);
-				if (bullet.spriteIndex === 2) {
-					graph.globalCompositeOperation = "lighter";
-					graph.globalAlpha = 0.3;
-					drawSprite(
-						graph,
-						bulletSprites[bullet.spriteIndex],
-						-(bullet.glowWidth / 2),
-						-(bullet.glowHeight / 2) + bullet.height / 2,
-						bullet.glowWidth,
-						bullet.glowHeight,
-						bullet.dir - Math.PI / 2,
-						false,
-						0,
-						0,
-						0,
-					);
-				} else {
-					drawSprite(
-						graph,
-						bulletSprites[bullet.spriteIndex],
-						-(bullet.width / 2),
-						0,
-						bullet.width,
-						bullet.height + 8,
-						bullet.dir - Math.PI / 2,
-						false,
-						0,
-						0,
-						0,
-					);
-				}
-				graph.restore();
-			}
-		}
+		bullet.wasActiveThisFrame = bullet.active;
+		bullet.update(delta, currentTime, clutter, st.gameMap, st.players);
 		if (st.settings.showBTrails && bullet.trailAlpha > 0) {
-			graph.save();
 			let x = Math.round(bullet.startX - st.startX);
 			let y = Math.round(bullet.startY - st.startY);
 			let x2 = Math.round(bullet.x - st.startX);
 			let y2 = Math.round(bullet.y - st.startY);
-			let trailGrad = graph.createLinearGradient(x, y, x2, y2);
-			trailGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
-			trailGrad.addColorStop(1, `rgba(255, 255, 255, ${bullet.trailAlpha})`);
-			graph.strokeStyle = trailGrad;
-			graph.lineWidth = bullet.trailWidth;
-			graph.beginPath();
-			graph.moveTo(x, y);
-			graph.lineTo(x2, y2);
-			graph.closePath();
-			graph.stroke();
+			const trailDx = x2 - x;
+			const trailDy = y2 - y;
+			const trailLen = Math.hypot(trailDx, trailDy);
+			if (trailLen > 0) {
+				// one unit-space gradient reused for every trail: the transform
+				// stretches it onto the trail line and globalAlpha applies the
+				// per-bullet trailAlpha, so no gradient is allocated per frame
+				if (trailGradient == null) {
+					trailGradient = graph.createLinearGradient(0, 0, 1, 0);
+					trailGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
+					trailGradient.addColorStop(1, "rgba(255, 255, 255, 1)");
+				}
+				graph.save();
+				graph.translate(x, y);
+				graph.rotate(Math.atan2(trailDy, trailDx));
+				graph.scale(trailLen, 1);
+				graph.globalAlpha = bullet.trailAlpha;
+				graph.strokeStyle = trailGradient;
+				graph.lineWidth = bullet.trailWidth;
+				graph.beginPath();
+				graph.moveTo(0, 0);
+				graph.lineTo(1, 0);
+				graph.closePath();
+				graph.stroke();
+				graph.restore();
+			}
+		}
+	}
+	graph.globalAlpha = 1;
+}
+
+// draws the bullet sprites at their post-update positions; kept at the original
+// spot in the frame (after players) so bullets still render above game objects
+function drawBullets() {
+	graph.globalAlpha = 1;
+	for (const bullet of bullets) {
+		const drawThisFrame = bullet.active || (bullet.wasActiveThisFrame && !bullet.active);
+		if (!drawThisFrame) continue;
+		const screenX = bullet.x - st.startX;
+		const screenY = bullet.y - st.startY;
+		if (canSee(screenX, screenY, bullet.height, bullet.height)) {
+			graph.save();
+			graph.translate(screenX, screenY);
+			if (bullet.spriteIndex === 2) {
+				graph.globalCompositeOperation = "lighter";
+				graph.globalAlpha = 0.3;
+				drawSprite(
+					graph,
+					bulletSprites[bullet.spriteIndex],
+					-(bullet.glowWidth / 2),
+					-(bullet.glowHeight / 2) + bullet.height / 2,
+					bullet.glowWidth,
+					bullet.glowHeight,
+					bullet.dir - Math.PI / 2,
+					false,
+					0,
+					0,
+					0,
+				);
+			} else {
+				drawSprite(
+					graph,
+					bulletSprites[bullet.spriteIndex],
+					-(bullet.width / 2),
+					0,
+					bullet.width,
+					bullet.height + 8,
+					bullet.dir - Math.PI / 2,
+					false,
+					0,
+					0,
+					0,
+				);
+			}
 			graph.restore();
 		}
 	}
@@ -1950,7 +2505,8 @@ function updateBullets(delta: number) {
 
 declare global {
 	interface Window {
-		joinRoom: typeof joinRoom;
+		joinRoom: (roomName: string, password?: string) => Promise<boolean>;
+		refreshLogin: () => Promise<boolean>;
 	}
 }
 // so we don't take over and break the back and forward buttons
@@ -1959,37 +2515,55 @@ declare global {
 // });
 
 window.joinRoom = joinRoom;
-async function joinRoom(roomName: string) {
+async function joinRoom(roomName: string, password?: string) {
 	if (st.changingLobby) return false;
 	// history.pushState(room, "", `${location.origin}/?${room}`);
 	st.changingLobby = true;
+	st.isHost = false;
+	st.hostSecret = null;
 
 	const resp = await fetch(`/api/getIP?room=${roomName}`);
+	if (!resp.ok) {
+		st.changingLobby = false;
+		return false;
+	}
 	const { ip, port, room } = await resp.json();
 	if (room === st.player.room) {
 		st.changingLobby = false;
 		return false;
 	}
 
+	const auth = password ? { password } : undefined;
 	if (!socket) {
-		socket = io(`/${room}`);
+		socket = io(`/${room}`, { auth });
 		st.socket = socket;
 		setupSocket(socket);
 		setupInitialSocket(socket);
 	} else {
 		socket.close();
-		socket = io(`/${room}`);
+		socket = io(`/${room}`, { auth });
 		st.socket = socket;
 		setupSocket(socket);
 	}
 	inMainMenu = true;
 	hideUI(true);
-	document.getElementById("linkBoxLeft")!.style.display = "block";
 	document.getElementById("linkBoxRight")!.style.display = "block";
 	st.chatLines = [];
 
 	return true;
 }
+
+function closeServer() {
+	if (st.isHost && st.hostSecret) {
+		socket?.emit("closeRoom", st.hostSecret);
+	}
+}
+declare global {
+	interface Window {
+		closeServer: typeof closeServer;
+	}
+}
+window.closeServer = closeServer;
 var classSpriteSheets: {
 	upSprites: Sprite[];
 	downSprites: Sprite[];
@@ -2121,8 +2695,18 @@ function loadDefaultSprites(base: string) {
 
 var mainTitleText = document.getElementById("mainTitleText")!;
 function updateMenuInfo(info: string) {
-	// active security risk
-	mainTitleText.innerHTML = DOMPurify.sanitize(info);
+	mainTitleText.textContent = info;
+}
+
+// One <style> element reused across mod loads, and a blob-URL setter that frees
+// the URL it replaces. Asset URLs live in localStorage, so without this every mod
+// switch leaked the previous pack's blobs for the rest of the session.
+let modStyleElement: HTMLStyleElement | null = null;
+function setAssetUrl(key: string, url: string) {
+	const previous = localStorage.getItem(key);
+	// only revoke what we own; a URL from an earlier page load is already dead
+	if (previous?.startsWith("blob:")) URL.revokeObjectURL(previous);
+	localStorage.setItem(key, url);
 }
 
 var linkedMod = location.hash.replace("#", "");
@@ -2132,8 +2716,7 @@ var loadingTexturePack = false;
 var modInfo = document.getElementById("modInfo")!;
 function setModInfoText(info: string) {
 	if (modInfo) {
-		// active security risk
-		modInfo.innerHTML = DOMPurify.sanitize(info);
+		modInfo.textContent = info;
 	}
 }
 
@@ -2159,8 +2742,12 @@ async function loadModPack(url: string, isBaseAssets: boolean) {
 			loadingTexturePack = true;
 			if (url.includes(".")) {
 				modPath = url;
-				if (!modPath.match(/^https?:\/\//i)) {
-					modPath = `http://${modPath}`;
+				if (modPath.startsWith("/")) {
+					modPath = `${window.location.origin}${modPath}`;
+				} else if (!modPath.match(/^https?:\/\//i)) {
+					// https, not http: the game is served over TLS in production, so an
+					// http:// mod URL is blocked outright as mixed content
+					modPath = `https://${modPath}`;
 				}
 			} else {
 				modPath = `https://dl.dropboxusercontent.com/s/${url}/vertixmod.zip`;
@@ -2183,30 +2770,43 @@ async function loadModPack(url: string, isBaseAssets: boolean) {
 				if (entry.filename.includes("modinfo")) {
 					setModInfoText(data);
 				} else if (entry.filename.includes("cssmod")) {
-					let styleElem = document.createElement("style");
-					styleElem.textContent = data;
+					// reuse one <style> element: appending a new one per load meant every
+					// mod you tried stayed stacked in <head> for the rest of the session
+					if (!modStyleElement) {
+						modStyleElement = document.createElement("style");
+						document.head.appendChild(modStyleElement);
+					}
+					modStyleElement.textContent = data;
 				} else if (entry.filename.includes("gameinfo")) {
 					data = data.replace(/(\r\n|\n|\r)/gm, "");
 					let parsed = JSON.parse(data);
 					updateMenuInfo(parsed.name);
 				} else if (entry.filename.includes("charinfo")) {
-					let split = data.replace(/(\r\n|\n|\r)/gm, "").split("|");
-					let tmp = split.map((s) => JSON.parse(s));
-					st.characterClasses = tmp;
-					// hacky and may not work
-					st.loadout.class = st.characterClasses.find(
-						(c) => c.folderName === st.loadout.class.folderName,
-					)!;
+					// split on "|"; filter empties so a trailing separator can't feed
+					// JSON.parse("") and abort the whole mod load
+					const split = data.replace(/(\r\n|\n|\r)/gm, "").split("|");
+					const modClasses = split.filter((s) => s.trim()).map((s) => JSON.parse(s));
+					// mods often ship partial class defs (just names/sprite folders);
+					// merge onto the base class of the same folderName so omitted
+					// geometry (width/height/weaponIndexes) survives — otherwise the
+					// loadout preview draws with NaN coords and goes blank
+					st.characterClasses = modClasses.map((mc) => {
+						const base = baseCharacterClasses.find((b) => b.folderName === mc.folderName);
+						return base ? { ...base, ...mc } : mc;
+					});
+					// keep the current class if the mod still defines it, otherwise fall
+					// back to the first class — never leave st.loadout.class undefined
+					st.loadout.class =
+						st.characterClasses.find((c) => c.folderName === st.loadout.class?.folderName) ??
+						st.characterClasses[0];
 				}
 			} else if (basePath === "sprites") {
 				let data = await entry.getData(new zip.BlobWriter("image/png"));
-				let imgAsDataURL = URL.createObjectURL(data);
-				localStorage.setItem(entry.filename, imgAsDataURL);
+				setAssetUrl(entry.filename, URL.createObjectURL(data));
 			} else if (basePath === "sounds") {
 				entry.filename = entry.filename.replace(`.${fileFormat}`, "");
 				let data = await entry.getData(new zip.BlobWriter(`audio/${fileFormat}`));
-				let soundAsDataURL = URL.createObjectURL(data);
-				localStorage.setItem(`${entry.filename}data`, soundAsDataURL);
+				setAssetUrl(`${entry.filename}data`, URL.createObjectURL(data));
 				localStorage.setItem(`${entry.filename}format`, fileFormat);
 			}
 		}
@@ -2215,6 +2815,9 @@ async function loadModPack(url: string, isBaseAssets: boolean) {
 		loadDefaultSprites("sprites/");
 		loadSounds("sounds/");
 		loadingTexturePack = false;
+		// sprite sheets were just rebuilt — nudge reactive views (menu loadout
+		// preview) to redraw so a newly-picked mod actually shows in the menu
+		st.assetVersion++;
 	} catch (err) {
 		console.error(err);
 		loadingTexturePack = false;
@@ -2265,7 +2868,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 				hat.imgToLoad++;
 				hat.lS.index = spriteIndex;
 				spriteIndex++;
-				hat.lS.src = `/images/hats/${tmpAcc.hat.id}/l.png`;
+				hat.lS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/l.png`;
 				hat.lS.onload = () => {
 					hat.imgToLoad--;
 					hat.lS.isLoaded = true;
@@ -2274,7 +2877,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 				hat.imgToLoad++;
 				hat.rS.index = spriteIndex;
 				spriteIndex++;
-				hat.rS.src = `/images/hats/${tmpAcc.hat.id}/l.png`;
+				hat.rS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/l.png`;
 				hat.rS.onload = () => {
 					hat.rS = flipSprite(hat.rS, true);
 					hat.imgToLoad--;
@@ -2286,7 +2889,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 				hat.imgToLoad++;
 				hat.uS.index = spriteIndex;
 				spriteIndex++;
-				hat.uS.src = `/images/hats/${tmpAcc.hat.id}/u.png`;
+				hat.uS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/u.png`;
 				hat.uS.onload = () => {
 					hat.imgToLoad--;
 					hat.uS.isLoaded = true;
@@ -2296,7 +2899,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 			hat.imgToLoad++;
 			hat.dS.index = spriteIndex;
 			spriteIndex++;
-			hat.dS.src = `/images/hats/${tmpAcc.hat.id}/d.png`;
+			hat.dS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/d.png`;
 			hat.dS.onload = () => {
 				hat.imgToLoad--;
 				hat.dS.isLoaded = true;
@@ -2353,7 +2956,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 			d.lS = new Image() as Sprite;
 			d.lS.index = spriteIndex;
 			spriteIndex++;
-			d.lS.src = `/images/shirts/${tmpAcc.shirt.id}/l.png`;
+			d.lS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/l.png`;
 			d.lS.onload = () => {
 				d.imgToLoad--;
 				d.lS.isLoaded = true;
@@ -2363,7 +2966,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 			d.rS = new Image() as Sprite;
 			d.rS.index = spriteIndex;
 			spriteIndex++;
-			d.rS.src = `/images/shirts/${tmpAcc.shirt.id}/l.png`;
+			d.rS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/l.png`;
 			d.rS.onload = () => {
 				d.rS = flipSprite(d.rS, true);
 				d.imgToLoad--;
@@ -2376,7 +2979,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 			d.uS = new Image() as Sprite;
 			d.uS.index = spriteIndex;
 			spriteIndex++;
-			d.uS.src = `/images/shirts/${tmpAcc.shirt.id}/u.png`;
+			d.uS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/u.png`;
 			d.uS.onload = () => {
 				d.imgToLoad--;
 				d.uS.isLoaded = true;
@@ -2387,7 +2990,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 		d.dS = new Image() as Sprite;
 		d.dS.index = spriteIndex;
 		spriteIndex++;
-		d.dS.src = `/images/shirts/${tmpAcc.shirt.id}/d.png`;
+		d.dS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/d.png`;
 		d.dS.onload = () => {
 			d.imgToLoad--;
 			d.dS.isLoaded = true;
@@ -2425,6 +3028,12 @@ function getWeaponSprite(weaponIndex: number, camo: number, angle: number) {
 		} else {
 			wepSprite = wepSprites.downSprite;
 		}
+		// sprites come from async-loading blob URLs, so this can run before the
+		// weapon image has decoded. Caching the resulting 0x0 canvas made the weapon
+		// render as nothing for the rest of the session, and the camo pass below then
+		// threw InvalidStateError on every load. Both callers null-check, so bail and
+		// let a later frame build it once the image is actually there.
+		if (!wepSprite.isLoaded || !wepSprite.width || !wepSprite.height) return;
 		let canvasElem = document.createElement("canvas");
 		let ctx = canvasElem.getContext("2d")!;
 		ctx.imageSmoothingEnabled = false;
@@ -2450,7 +3059,11 @@ function getWeaponSprite(weaponIndex: number, camo: number, angle: number) {
 				ctx.drawImage(flip ? flipSprite(img, true) : img, 0, 0, img.width, img.height);
 				cachedWeaponSprites[tmpIndex] = canvas;
 			};
-			img.src = `/images/camos/${camo + 1}.png`;
+			// custom camos carry their own image URL (id-derived path won't exist)
+			const camoEntry = st.cosmetics.camos[0]?.find((c) => c.id === camo + 1) as
+				| { image?: string }
+				| undefined;
+			img.src = camoEntry?.image ?? `/images/camos/${camo + 1}.png`;
 		}
 	}
 	return cachedWeaponSprites[tmpIndex];
@@ -2671,6 +3284,169 @@ function drawPlayer(plr: Player, delta: number) {
 	playerContext.restore();
 }
 
+declare global {
+	interface Window {
+		renderLoadoutPreview: typeof renderLoadoutPreview;
+	}
+}
+window.renderLoadoutPreview = renderLoadoutPreview;
+// Draws the currently selected loadout (st.loadout) as a static, front-facing
+// character on the given canvas. Reuses the same sprite getters as drawPlayer
+// but touches no game/camera state, so the live renderer is unaffected.
+// Sprites and hat/shirt images load lazily; drawSprite skips images that
+// aren't ready yet, so callers should redraw a few times after loadout changes.
+function renderLoadoutPreview(canvas: HTMLCanvasElement) {
+	const ctx = canvas.getContext("2d")!;
+	ctx.imageSmoothingEnabled = false;
+	// reset transform/alpha so a prior render that threw mid-draw (e.g. a mod
+	// sprite still loading) can't leave the context in a broken state
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
+	ctx.globalAlpha = 1;
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	// class can briefly be undefined while a mod swaps the class list — bail
+	// rather than throw (a later assetVersion re-render will draw it)
+	if (!st.loadout.class) return;
+	const classIndex = st.characterClasses.findIndex(
+		(c) => c.folderName === st.loadout.class.folderName,
+	);
+	if (classIndex < 0) return;
+	const cls = st.loadout.class;
+	const previewPlayer = {
+		classIndex,
+		width: cls.width,
+		height: cls.height,
+		account: {
+			rank: 0,
+			hat: st.loadout.hat ?? undefined,
+			shirt: st.loadout.shirt ?? undefined,
+		},
+	} as unknown as Player;
+
+	ctx.save();
+	try {
+	// feet baseline placed so the hat (above) and the weapon (below) both fit;
+	// drawing is in world units sized for a 200px-wide canvas, so scale up
+	// proportionally when the preview canvas is larger
+	const previewScale = canvas.width / 200;
+	ctx.translate(canvas.width / 2, canvas.height - 60 * previewScale);
+	ctx.scale(previewScale, previewScale);
+	ctx.globalAlpha = 1;
+
+	const lowerBodySprite = getPlayerSprite(classIndex, 0, 1);
+	if (lowerBodySprite != null) {
+		drawSprite(
+			ctx,
+			lowerBodySprite,
+			-(cls.width / 2),
+			-(cls.height * 0.318),
+			cls.width,
+			cls.height * 0.318,
+			0,
+			true,
+			0,
+			0.5,
+			0,
+		);
+	}
+	const upperBodySprite = getPlayerSprite(classIndex, 0, 0);
+	if (upperBodySprite != null) {
+		drawSprite(
+			ctx,
+			upperBodySprite,
+			-(cls.width / 2),
+			-cls.height,
+			cls.width,
+			cls.height * 0.682,
+			0,
+			true,
+			cls.height * 0.477,
+			0.5,
+			0,
+		);
+	}
+	const shirtSprite = getShirtSprite(previewPlayer, 0);
+	if (shirtSprite != null) {
+		ctx.globalAlpha = 0.9;
+		drawSprite(
+			ctx,
+			shirtSprite,
+			-(cls.width / 2),
+			-cls.height,
+			cls.width,
+			cls.height * 0.682,
+			0,
+			true,
+			cls.height * 0.477,
+			0.5,
+			0,
+		);
+		ctx.globalAlpha = 1;
+	}
+	const hatScale = cls.width * 0.833;
+	const hatSprite = getHatSprite(previewPlayer, 0);
+	if (hatSprite != null) {
+		drawSprite(
+			ctx,
+			hatSprite,
+			-(hatScale / 2),
+			-(cls.height + hatScale * 0.045),
+			hatScale,
+			hatScale,
+			0,
+			false,
+			0,
+			0.5,
+			0,
+		);
+	}
+
+	// front-facing primary weapon pointing down, with both arms — mirrors
+	// drawPlayer's front-weapon branch for the down-facing (angle 0) case
+	const baseWeapon = weapons[cls.weaponIndexes[0]];
+	if (baseWeapon) {
+		const camoId = st.loadout.primaryCamo?.id ?? 0;
+		const weaponSprite = getWeaponSprite(baseWeapon.weaponIndex, camoId, 0);
+		const armSprite = classSpriteSheets[classIndex]?.arm;
+		if (weaponSprite != null) {
+			ctx.globalAlpha = 0.9;
+			ctx.save();
+			ctx.translate(0, -baseWeapon.yOffset + baseWeapon.holdDist);
+			drawSprite(
+				ctx,
+				weaponSprite,
+				-(baseWeapon.width / 2),
+				0,
+				baseWeapon.width,
+				baseWeapon.length,
+				0,
+				false,
+				0,
+				0,
+				0,
+			);
+			ctx.translate(0, -baseWeapon.holdDist + 10);
+			if (armSprite != null) {
+				ctx.translate(10, -13);
+				ctx.rotate(0.7);
+				drawSprite(ctx, armSprite, 0, 0, 8, 32, 0, false, 0, 0, 0);
+				ctx.rotate(-0.7);
+				ctx.translate(-28, -1);
+				ctx.rotate(-0.25);
+				drawSprite(ctx, armSprite, 0, 0, 8, 32, 0, false, 0, 0, 0);
+				ctx.rotate(0.25);
+			}
+			ctx.restore();
+			ctx.globalAlpha = 1;
+		}
+	}
+	ctx.restore();
+	} catch {
+		// a mod sprite may still be loading with invalid dimensions; skip this
+		// frame — the staggered re-renders / assetVersion bump redraw once ready
+	}
+}
+
 function drawFlag(flg: FlagObject) {
 	flg.ac--;
 	if (flg.ac <= 0) {
@@ -2713,12 +3489,37 @@ function drawClutter(clt: ClutterObject) {
 	}
 }
 
+type GameObjectRenderEntry =
+	| { data: Player; type: "player" }
+	| { data: ClutterObject; type: "clutter" }
+	| { data: FlagObject; type: "flag" };
+// persistent pooled list: refilled and sorted in place every frame so no
+// per-frame array/wrapper allocations (sort is stable, same tie-order as toSorted)
+const gameObjectRenderList: GameObjectRenderEntry[] = [];
 function getGameObjectRenderData() {
-	return [
-		...st.players.map((player) => ({ data: player, type: "player" as const })),
-		...clutter.map((clutter) => ({ data: clutter, type: "clutter" as const })),
-		...flags.map((flag) => ({ data: flag, type: "flag" as const })),
-	].toSorted((a, b) => a.data.y - b.data.y);
+	const total = st.players.length + clutter.length + flags.length;
+	while (gameObjectRenderList.length < total) {
+		gameObjectRenderList.push({ data: null as unknown as Player, type: "player" });
+	}
+	gameObjectRenderList.length = total;
+	let n = 0;
+	for (const player of st.players) {
+		const entry = gameObjectRenderList[n++] as { data: Player; type: string };
+		entry.data = player;
+		entry.type = "player";
+	}
+	for (const clt of clutter) {
+		const entry = gameObjectRenderList[n++] as { data: ClutterObject; type: string };
+		entry.data = clt;
+		entry.type = "clutter";
+	}
+	for (const flag of flags) {
+		const entry = gameObjectRenderList[n++] as { data: FlagObject; type: string };
+		entry.data = flag;
+		entry.type = "flag";
+	}
+	gameObjectRenderList.sort((a, b) => a.data.y - b.data.y);
+	return gameObjectRenderList;
 }
 
 function drawGameObjects(delta: number) {
@@ -2839,7 +3640,11 @@ function drawBackground() {
 	);
 }
 function getCachedWall(tile: Tile) {
-	let cacheKey = `${tile.left}${tile.right}${tile.top}${tile.bottom}${tile.topLeft}${tile.topRight}${tile.bottomLeft}${tile.bottomRight}${tile.edgeTile}${tile.hasCollision}`;
+	let cacheKey = tile.wallCacheKey;
+	if (cacheKey === undefined) {
+		cacheKey = `${tile.left}${tile.right}${tile.top}${tile.bottom}${tile.topLeft}${tile.topRight}${tile.bottomLeft}${tile.bottomRight}${tile.edgeTile}${tile.hasCollision}`;
+		tile.wallCacheKey = cacheKey;
+	}
 
 	if (cachedWalls[cacheKey] === undefined && wallSprite?.isLoaded) {
 		let canvasElem = document.createElement("canvas");
@@ -2915,7 +3720,11 @@ function getCachedWall(tile: Tile) {
 }
 var tilesPerFloorTile = 8;
 function getCachedFloor(tile: Tile) {
-	let tmpIndex = `${tile.spriteIndex}${tile.left}${tile.right}${tile.top}${tile.bottom}${tile.topLeft}${tile.topRight}`;
+	let tmpIndex = tile.floorCacheKey;
+	if (tmpIndex === undefined) {
+		tmpIndex = `${tile.spriteIndex}${tile.left}${tile.right}${tile.top}${tile.bottom}${tile.topLeft}${tile.topRight}`;
+		tile.floorCacheKey = tmpIndex;
+	}
 	if (cachedFloors[tmpIndex] === undefined && sideWalkSprite != null && sideWalkSprite.isLoaded) {
 		let tmpCanvas = document.createElement("canvas");
 		let ctx = tmpCanvas.getContext("2d")!;
@@ -3134,7 +3943,14 @@ function getCachedShadow(
 	height: number,
 	scaleY: number,
 ) {
-	if (cachedShadows[sprite.index!] === undefined && width !== 0 && sprite?.isLoaded) {
+	if (
+		cachedShadows[sprite.index!] === undefined &&
+		width > 0 &&
+		height > 0 &&
+		Number.isFinite(width) &&
+		Number.isFinite(height) &&
+		sprite?.isLoaded
+	) {
 		let tmpCanvas = document.createElement("canvas");
 		let ctx = tmpCanvas.getContext("2d")!;
 		ctx.imageSmoothingEnabled = false;
@@ -3162,7 +3978,12 @@ function getCachedShadow(
 
 function callUpdate() {
 	requestAnimationFrame(callUpdate);
-	currentTime = Date.now();
+	// performance.now(), not Date.now(): the latter has 1ms resolution, so at
+	// 144Hz delta alternated 6/7 and at 240Hz many frames measured 0 — micro-
+	// stutter for the local player, and zeros that the server then rounded UP to
+	// MIN_MOVEMENT_DELTA (8ms), permanently over-integrating high-refresh clients
+	// and snapping them back on every reconciliation.
+	currentTime = performance.now();
 	updateGameLoop();
 }
 callUpdate();

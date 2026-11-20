@@ -84,6 +84,8 @@ export function allItems(type: UnlockItemType): ({ id: number; name: string; cha
 				price: c.price,
 				// sprays need render settings — clients read .info on the equipped spray
 				...(type === "spray" ? { info: { scale: 64, alpha: 1, resolution: 30 } } : {}),
+				// hats offset the nameplate — drawPlayerNames subtracts .nameY
+				...(type === "hat" ? { nameY: 0 } : {}),
 			})),
 	]);
 }

@@ -265,9 +265,16 @@ async function loadCustomCosmetics() {
 					name: string;
 					chance: number;
 					image?: string;
+					nameY?: number;
 				}[];
 				if (!list.some((c) => c.id === item.id)) {
-					list.push({ id: item.id, name: item.name, chance: item.chance, image: item.image });
+					list.push({
+						id: item.id,
+						name: item.name,
+						chance: item.chance,
+						image: item.image,
+						...(item.type === "hat" ? { nameY: 0 } : {}),
+					});
 				}
 			}
 		}

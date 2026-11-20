@@ -53,7 +53,7 @@ import {
 	listMarketItem,
 	sellMarketItem,
 } from "./market.ts";
-import { customImageFile, getCustomCosmetics } from "./customItems.ts";
+import { customImageData, getCustomCosmetics } from "./customItems.ts";
 import { isMaintenanceEnabled } from "./server-ops.ts";
 import { writeServerStat, pruneServerStats } from "./db.ts";
 import {
@@ -63,7 +63,7 @@ import {
 	type PresenceEntry,
 } from "./presence.ts";
 import { log, formatDuration } from "./log.ts";
-import { defaultGenData } from "./maps.ts";
+import { defaultGenData, loadCustomMaps } from "./maps.ts";
 
 const bootStartedAt = Date.now();
 const isProd = process.env.NODE_ENV === "production";
@@ -71,9 +71,9 @@ const isProd = process.env.NODE_ENV === "production";
 log.raw("");
 log.raw("  VERTIX ONLINE — game server");
 log.info("boot", `node ${process.version}, env=${isProd ? "production" : "development"}, log level=${log.level}`);
-log.info("boot", `maps: ${defaultGenData.length} loaded`);
-
 initDb();
+await loadCustomMaps();
+log.info("boot", `maps: ${defaultGenData.length} loaded`);
 log.info("boot", `database ready (${process.env.DATA_DIR ? `${process.env.DATA_DIR}/vertix.db` : "server/vertix.db"})`);
 
 // one-off backfill: unlock whatever every existing account's current lifetime
@@ -596,11 +596,11 @@ api.get("/customCosmetics", (c) => {
 
 api.get("/customCosmeticImg/:file", (c) => {
 	const rowid = parseInt(c.req.param("file").replace(/\.png$/, ""), 10);
-	const file = customImageFile(rowid);
-	if (!file) return c.notFound();
+	const art = customImageData(rowid);
+	if (!art) return c.notFound();
 	c.header("Content-Type", "image/png");
 	c.header("Cache-Control", "public, max-age=60");
-	return c.body(fs.readFileSync(file));
+	return c.body(new Uint8Array(art.data ?? fs.readFileSync(art.file!)));
 });
 
 // root app: API mounted under /api, static files (production) at /

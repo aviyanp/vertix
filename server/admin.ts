@@ -1,8 +1,6 @@
 import { Hono, type Context } from "hono";
 import { timingSafeEqual } from "node:crypto";
 import { Buffer } from "node:buffer";
-import { rmSync } from "node:fs";
-import { join } from "node:path";
 import type { Server } from "socket.io";
 import { rooms, Room, createPermanentRoom } from "./room.ts";
 import {
@@ -48,6 +46,7 @@ import {
 	setUserKr,
 	getModeMapOverrides,
 	setModeMapOverride,
+	deleteCustomMap,
 } from "./db.ts";
 import { log, formatDuration, setLogLevel, type LogLevel } from "./log.ts";
 import { gameModes } from "core/src/gamemodes.ts";
@@ -664,11 +663,10 @@ export function createAdminRoutes(io: Server): Hono<AdminEnv> {
 		}
 		try {
 			const png = Buffer.from(body.png.replace(/^data:[^,]*,/, ""), "base64");
-			// persisted under its index so the pool order stays identical on restart
-			const { mapIndex, width, height } = await addMapBuffer(png, String(defaultGenData.length));
+			const { mapIndex, width, height } = await addMapBuffer(png);
 			if (width < 8 || width > 64 || height < 8 || height > 64) {
 				defaultGenData.pop();
-				rmSync(join(import.meta.dirname, "maps", `${mapIndex}.png`), { force: true });
+				deleteCustomMap(mapIndex);
 				return bad(c, `Map must be 8-64 tiles per side (got ${width}x${height})`);
 			}
 			audited(c, actor, "createMap", `map:${mapIndex}`, { width, height });

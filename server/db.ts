@@ -84,6 +84,15 @@ export function initDb(): void {
 			price INTEGER,
 			hide INTEGER NOT NULL DEFAULT 0,
 			image TEXT NOT NULL,
+			png BLOB,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		-- art and maps live in SQLite, not the filesystem: a container rebuild
+		-- re-clones the repo (wiping server/data + new maps/*.png) but keeps the DB
+		CREATE TABLE IF NOT EXISTS custom_maps (
+			map_index INTEGER PRIMARY KEY,
+			png BLOB NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
@@ -328,6 +337,10 @@ export function initDb(): void {
 	}
 	if (!unlockColumns.map((c) => c.name).includes("listed_price")) {
 		db.exec("ALTER TABLE user_unlocks ADD COLUMN listed_price INTEGER");
+	}
+	const cosmeticColumns = db.prepare("PRAGMA table_info(custom_cosmetics)").all() as { name: string }[];
+	if (!cosmeticColumns.map((c) => c.name).includes("png")) {
+		db.exec("ALTER TABLE custom_cosmetics ADD COLUMN png BLOB");
 	}
 	db.exec(
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_unlock_serial ON user_unlocks(item_type, item_id, serial)",
@@ -699,13 +712,37 @@ export function insertCustomCosmetic(row: {
 	price: number | null;
 	hide: number;
 	image: string;
+	png?: Buffer;
 }): number {
 	const res = getDb()
 		.prepare(
-			"INSERT INTO custom_cosmetics (type, name, chance, price, hide, image) VALUES (?, ?, ?, ?, ?, ?)",
+			"INSERT INTO custom_cosmetics (type, name, chance, price, hide, image, png) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		)
-		.run(row.type, row.name, row.chance, row.price, row.hide, row.image);
+		.run(row.type, row.name, row.chance, row.price, row.hide, row.image, row.png ?? null);
 	return Number(res.lastInsertRowid);
+}
+
+/** The stored artwork blob for a custom cosmetic (null for legacy file-backed rows). */
+export function getCustomCosmeticPng(rowid: number): Buffer | null {
+	const row = getDb()
+		.prepare("SELECT png FROM custom_cosmetics WHERE id = ?")
+		.get(rowid) as { png: Buffer | null } | undefined;
+	return row?.png ?? null;
+}
+
+export function insertCustomMap(mapIndex: number, png: Buffer): void {
+	getDb().prepare("INSERT OR REPLACE INTO custom_maps (map_index, png) VALUES (?, ?)").run(mapIndex, png);
+}
+
+export function deleteCustomMap(mapIndex: number): void {
+	getDb().prepare("DELETE FROM custom_maps WHERE map_index = ?").run(mapIndex);
+}
+
+export function getCustomMapRows(): { map_index: number; png: Buffer }[] {
+	return getDb().prepare("SELECT map_index, png FROM custom_maps ORDER BY map_index").all() as {
+		map_index: number;
+		png: Buffer;
+	}[];
 }
 
 export function deleteCustomCosmeticRow(id: number): CustomCosmeticRow | undefined {

@@ -3,16 +3,17 @@
  * catalogs so they behave like first-class items — milestones, drops, market,
  * loadout and equip validation all read through `allItems`/`itemById`.
  * Custom ids live at CUSTOM_ID_BASE + rowid so they can never collide with the
- * static catalogs, and their art is served from data/custom/ by /api routes.
+ * static catalogs, and their art lives in the custom_cosmetics.png blob served
+ * by /api/customCosmeticImg.
  */
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { camos, hats, shirts } from "core/src/skins.ts";
 import { sprays } from "core/src/sprays.ts";
 import {
 	getCustomCosmeticRows,
-	getDb,
+	getCustomCosmeticPng,
 	insertCustomCosmetic,
 	deleteCustomCosmeticRow,
 	type UnlockItemType,
@@ -74,7 +75,16 @@ export function allItems(type: UnlockItemType): ({ id: number; name: string; cha
 		...(STATIC[type] as { id: number; name: string; chance?: number; hide?: boolean }[]),
 		...getCustomCosmetics()
 			.filter((c) => c.type === type)
-			.map((c) => ({ id: c.id, name: c.name, chance: c.chance, hide: c.hide, image: c.image, price: c.price })),
+			.map((c) => ({
+				id: c.id,
+				name: c.name,
+				chance: c.chance,
+				hide: c.hide,
+				image: c.image,
+				price: c.price,
+				// sprays need render settings — clients read .info on the equipped spray
+				...(type === "spray" ? { info: { scale: 64, alpha: 1, resolution: 30 } } : {}),
+			})),
 	]);
 }
 
@@ -105,7 +115,6 @@ export async function createCustomCosmetic(input: {
 	// normalize to PNG so whatever the admin uploads stores uniformly
 	const png = await sharp(input.png).png().toBuffer().catch(() => null);
 	if (!png) throw new Error("Image must be a valid image file");
-	mkdirSync(CUSTOM_DIR, { recursive: true });
 	const rowid = insertCustomCosmetic({
 		type,
 		name,
@@ -113,10 +122,8 @@ export async function createCustomCosmetic(input: {
 		price: input.price !== null && Number.isInteger(input.price) && input.price! > 0 ? input.price : null,
 		hide: input.hide ? 1 : 0,
 		image: "",
+		png,
 	});
-	const file = `cosmetic_${rowid}.png`;
-	writeFileSync(join(CUSTOM_DIR, file), png);
-	getDb().prepare("UPDATE custom_cosmetics SET image = ? WHERE id = ?").run(file, rowid);
 	invalidateCustomCache();
 	return getCustomCosmetics().find((c) => c.rowid === rowid)!;
 }
@@ -131,9 +138,13 @@ export function deleteCustomCosmetic(cosmeticRowId: number): boolean {
 	return true;
 }
 
-export function customImageFile(rowid: number): string | null {
+/** Stored artwork: the DB blob (durable across container rebuilds), falling
+ * back to the legacy file on disk for rows created before the blob column. */
+export function customImageData(rowid: number): { data: Buffer; legacyFile?: never } | { file: string; data?: never } | null {
+	const blob = getCustomCosmeticPng(rowid);
+	if (blob) return { data: blob };
 	const r = getCustomCosmeticRows().find((x) => x.id === rowid);
 	if (!r?.image) return null;
 	const p = join(CUSTOM_DIR, r.image);
-	return p.startsWith(CUSTOM_DIR) ? p : null;
+	return p.startsWith(CUSTOM_DIR) ? { file: p } : null;
 }

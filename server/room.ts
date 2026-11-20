@@ -1278,7 +1278,7 @@ export class Room {
 		// one remote interpolation needs to settle on), then one refresh every
 		// ~2s so a socket that was briefly unwritable still converges.
 		this.quietTicks = rosterDirty ? 0 : this.quietTicks + 1;
-		if (rosterDirty || this.quietTicks === 1 || this.quietTicks >= 125) {
+		if (rosterDirty || this.quietTicks === 1 || this.quietTicks % 125 === 0) {
 			// ONE emit for the whole room: the roster is identical for every
 			// recipient, so socket.io serializes and fans it out once. It used to
 			// slice + serialize the whole roster per player per tick (O(players²)

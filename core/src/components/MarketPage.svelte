@@ -22,6 +22,7 @@
 	let signedIn = $state(true);
 	let loadError = $state("");
 	let toast = $state("");
+	let toastIsErr = $state(false);
 	let busy = $state(false);
 
 	let tab = $state<"all" | Item["type"] | "mine">("all");
@@ -55,8 +56,10 @@
 			});
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok || body.success === false) {
+				toastIsErr = true;
 				toast = body.error ?? "Trade failed";
 			} else {
+				toastIsErr = false;
 				toast = done;
 				await load();
 			}
@@ -124,7 +127,7 @@
 		</select>
 	</nav>
 
-	{#if toast}<div class="toast">{toast}</div>{/if}
+	{#if toast}<div class="toast" class:err={toastIsErr}>{toast}</div>{/if}
 	{#if loadError}<div class="toast err">{loadError}</div>{/if}
 
 	{#if !data}

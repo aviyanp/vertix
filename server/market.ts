@@ -7,6 +7,7 @@
 import { KR_SELLBACK, krPriceForChance, marketSprayPrice } from "core/src/market.ts";
 import { camos, hats, shirts } from "core/src/skins.ts";
 import { sprays } from "core/src/sprays.ts";
+import { getCosmeticImageUrl } from "core/src/utils.ts";
 import {
 	addKr,
 	deleteUnlock,
@@ -71,7 +72,6 @@ export function getMarketPageData(userId: number | undefined): MarketPageData {
 	const items: MarketPageItem[] = [];
 	const owned = userId ? new Map(getUserUnlocks(userId).map((u) => [`${u.item_type}:${u.item_id}`, u])) : new Map();
 
-	const seenKeys = new Set<string>(); // TEMP TEST DEDUPE — camo:125 duplicated in skins.ts
 	for (const [type, catalog] of [
 		["hat", hats],
 		["shirt", shirts],
@@ -79,9 +79,6 @@ export function getMarketPageData(userId: number | undefined): MarketPageData {
 	] as const) {
 		for (const item of catalog) {
 			if (item.hide) continue;
-			const key = `${type}:${item.id}`;
-			if (seenKeys.has(key)) continue;
-			seenKeys.add(key);
 			const price = krPriceForChance(item.chance);
 			const s = stats.get(`${type}:${item.id}`);
 			items.push({
@@ -89,7 +86,7 @@ export function getMarketPageData(userId: number | undefined): MarketPageData {
 				id: item.id,
 				name: item.name,
 				chance: item.chance,
-				image: `/images/${type}s/${item.id}/d.png`,
+				image: getCosmeticImageUrl(type, item.id),
 				officialPrice: price,
 				sellPrice: sellPrice(price),
 				minted: s?.minted ?? 0,

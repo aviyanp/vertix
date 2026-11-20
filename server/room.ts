@@ -205,6 +205,8 @@ export class Room {
 	private lastSentSnapshot: number[] = [];
 	/** last isn each player was sent, by player index */
 	private lastSentIsn = new Map<number, number>();
+	/** ticks since the roster last changed — drives the reliable resend schedule */
+	private quietTicks = 0;
 	/**
 	 * Each player's camo pick, keyed by catalogue weapon index. Weapons are cloned
 	 * per player now, and applyClassLoadout rebuilds those clones on every spawn
@@ -776,6 +778,9 @@ export class Room {
 				}
 				this.io.emit("rem", player.index);
 				this.game.players.splice(this.game.players.indexOf(player), 1);
+				// indices are never reused, so drop their ack cache here or permanent
+				// rooms accumulate one lastSentIsn entry per departed player forever
+				this.lastSentIsn.delete(player.index);
 				if (this.game.players.length === 0) {
 					this.emptySince = Date.now();
 				}
@@ -1251,35 +1256,42 @@ export class Room {
 			// was invisible to everyone else.
 			base.push(7, pl.index, pl.x, pl.y, pl.angle, pl.jumpY, 0);
 		}
-		// Skip the send entirely when nothing moved. An idle room used to pay
-		// 62.5 serialized broadcasts/sec forever; positions only change when an
-		// input is applied, and that same input is what advances isn — so a
-		// buffer comparison plus the isn map catches every real change.
+		// isn goes out BEFORE the roster: if a moved position reached the client
+		// ahead of its input ack, reconciliation would replay movement the server
+		// already applied (one frame of rubber-banding per tick).
 		let isnDirty = false;
-		for (const pl of players) {
-			if (pl.socketId && (pl.isn ?? 0) !== this.lastSentIsn.get(pl.index)) isnDirty = true;
-		}
-		const rosterDirty =
-			base.length !== this.lastSentSnapshot.length ||
-			base.some((v, i) => v !== this.lastSentSnapshot[i]);
-		if (!rosterDirty && !isnDirty) return;
-		// ONE emit for the whole room: the roster is identical for every
-		// recipient, so socket.io serializes and fans it out once. It used to
-		// slice + serialize the whole roster per player per tick (O(players²)
-		// packet work every 16ms). The only per-recipient value — each client's
-		// own last-applied input number — goes out as a separate tiny "isn".
-		if (rosterDirty) {
-			// volatile: a dropped frame is superseded 16ms later — buffering the
-			// stale one on a slow socket only adds latency and memory pressure
-			this.io.volatile.emit("rsd", base);
-			this.lastSentSnapshot = base.slice();
-		}
 		for (const pl of players) {
 			const isn = pl.isn ?? 0;
 			if (pl.socketId && isn !== this.lastSentIsn.get(pl.index)) {
 				this.io.to(pl.socketId).emit("isn", isn);
 				this.lastSentIsn.set(pl.index, isn);
+				isnDirty = true;
 			}
+		}
+		const rosterDirty =
+			base.length !== this.lastSentSnapshot.length ||
+			base.some((v, i) => v !== this.lastSentSnapshot[i]);
+		// A quiet room skips the send entirely — positions only change on applied
+		// input, and isn above catches the rest. Two exceptions still emit a
+		// RELIABLE copy: the first quiet tick after movement stops (volatile can
+		// drop a frame on a congested socket, and the final stop position is the
+		// one remote interpolation needs to settle on), then one refresh every
+		// ~2s so a socket that was briefly unwritable still converges.
+		this.quietTicks = rosterDirty ? 0 : this.quietTicks + 1;
+		if (rosterDirty || this.quietTicks === 1 || this.quietTicks >= 125) {
+			// ONE emit for the whole room: the roster is identical for every
+			// recipient, so socket.io serializes and fans it out once. It used to
+			// slice + serialize the whole roster per player per tick (O(players²)
+			// packet work every 16ms).
+			if (rosterDirty) {
+				// volatile while moving: a dropped frame is superseded 16ms later
+				this.io.volatile.emit("rsd", base);
+			} else {
+				this.io.emit("rsd", base);
+			}
+			this.lastSentSnapshot = base.slice();
+		} else if (!isnDirty) {
+			return;
 		}
 	}
 

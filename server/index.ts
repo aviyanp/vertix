@@ -762,7 +762,11 @@ if (process.env.NODE_ENV === "production") {
 		if (asset) {
 			c.header("Content-Type", asset.type);
 			c.header("Cache-Control", asset.cache);
-			if (asset.gz && c.req.header("accept-encoding")?.includes("gzip")) {
+			const ae = c.req.header("accept-encoding") ?? "";
+			// gzip must appear with a nonzero q — `includes` alone would serve it to
+			// a client that explicitly rejected it with `gzip;q=0`
+			const acceptsGzip = /(^|,)\s*gzip\b(?!\s*;\s*q=0(\.0+)?\s*(,|$))/i.test(ae);
+			if (asset.gz && acceptsGzip) {
 				c.header("Content-Encoding", "gzip");
 				c.header("Vary", "Accept-Encoding");
 				return c.body(new Uint8Array(asset.gz));

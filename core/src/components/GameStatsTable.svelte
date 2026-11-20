@@ -137,7 +137,7 @@
 								{#if cell.hoverInfo}
 									<div class="hoverTooltip">
 										{#if cell.hoverInfo.type === "hat"}
-											<img class="hatDisplayImage" src={`/images/hats/${cell.hoverInfo.id}/d.png`}>
+											<img class="hatDisplayImage" src={cell.hoverInfo.image ?? `/images/hats/${cell.hoverInfo.id}/d.png`}>
 											<div class="rewardName" style:color={cell.color}>
 												{cell.hoverInfo.name}
 											</div>
@@ -152,7 +152,7 @@
 												</div>
 											{/if}
 										{:else if cell.hoverInfo.type === "shirt"}
-											<img class="shirtDisplayImage" src={`/images/shirts/${cell.hoverInfo.id}/d.png`}>
+											<img class="shirtDisplayImage" src={cell.hoverInfo.image ?? `/images/shirts/${cell.hoverInfo.id}/d.png`}>
 											<div class="rewardName" style:color={cell.color}>
 												{cell.hoverInfo.name}
 											</div>
@@ -162,7 +162,7 @@
 											</div>
 											<div class="rewardDescription">{cell.hoverInfo.desc}</div>
 										{:else}
-											<img class="camoDisplayImage" src={`/images/camos/${cell.hoverInfo.id + 1}.png`}>
+											<img class="camoDisplayImage" src={cell.hoverInfo.image ?? `/images/camos/${cell.hoverInfo.id + 1}.png`}>
 											<div class="rewardName" style:color={cell.color}>
 												{cell.hoverInfo.name}
 											</div>

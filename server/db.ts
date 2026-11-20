@@ -76,6 +76,22 @@ export function initDb(): void {
 			PRIMARY KEY (user_id, item_type, item_id)
 		);
 
+		CREATE TABLE IF NOT EXISTS custom_cosmetics (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			type TEXT NOT NULL,
+			name TEXT NOT NULL,
+			chance REAL NOT NULL DEFAULT 100,
+			price INTEGER,
+			hide INTEGER NOT NULL DEFAULT 0,
+			image TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE TABLE IF NOT EXISTS mode_map_rotation (
+			mode TEXT PRIMARY KEY,
+			maps TEXT NOT NULL
+		);
+
 		CREATE TABLE IF NOT EXISTS user_crates (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id INTEGER NOT NULL REFERENCES users(id),
@@ -284,23 +300,29 @@ export function initDb(): void {
 		)
 		.all() as { rowid: number; item_type: string; item_id: number }[];
 	if (unserialled.length) {
-		const maxStmt = db.prepare(
-			"SELECT MAX(serial) AS m FROM user_unlocks WHERE item_type = ? AND item_id = ?",
+		const takenStmt = db.prepare(
+			"SELECT serial FROM user_unlocks WHERE item_type = ? AND item_id = ? AND serial IS NOT NULL",
 		);
 		const setStmt = db.prepare("UPDATE user_unlocks SET serial = ? WHERE rowid = ?");
-		const next = new Map<string, number>();
+		const taken = new Map<string, Set<number>>();
 		db.transaction(() => {
 			for (const r of unserialled) {
 				const key = `${r.item_type}:${r.item_id}`;
-				if (!next.has(key)) {
-					next.set(
+				if (!taken.has(key)) {
+					taken.set(
 						key,
-						(maxStmt.get(r.item_type, r.item_id) as { m: number | null }).m ?? 0,
+						new Set(
+							(takenStmt.all(r.item_type, r.item_id) as { serial: number }[]).map((s) => s.serial),
+						),
 					);
 				}
-				const serial = (next.get(key) ?? 0) + 1;
+				const used = taken.get(key)!;
+				let serial = 0;
+				do {
+					serial = 1 + Math.floor(Math.random() * 10_000_000);
+				} while (used.has(serial));
+				used.add(serial);
 				setStmt.run(serial, r.rowid);
-				next.set(key, serial);
 			}
 		})();
 	}
@@ -540,21 +562,36 @@ export function hasUnlock(userId: number, itemType: UnlockItemType, itemId: numb
 	return row !== undefined;
 }
 
+// serials are minted at random inside this range — a player's copy is a
+// collectible print number, not a count of how many exist
+const SERIAL_SPACE = 10_000_000;
+
 /**
- * Grants the unlock, minting its serial (MAX+1 within the item) inside the same
- * INSERT so a serial can never collide or skip. Returns the serial for a new
+ * Grants the unlock, minting a random serial that is unique within the item
+ * (retried on the astronomically rare collision). Returns the serial for a new
  * grant, null when already owned.
  */
-export function grantUnlock(userId: number, itemType: UnlockItemType, itemId: number): number | null {
-	const row = getDb()
-		.prepare(
-			`INSERT OR IGNORE INTO user_unlocks (user_id, item_type, item_id, serial)
-			 SELECT ?, ?, ?, COALESCE(MAX(serial), 0) + 1
-			 FROM user_unlocks WHERE item_type = ? AND item_id = ?
-			 RETURNING serial`,
-		)
-		.get(userId, itemType, itemId, itemType, itemId) as { serial: number } | undefined;
-	return row?.serial ?? null;
+export function grantUnlock(
+	userId: number,
+	itemType: UnlockItemType,
+	itemId: number,
+	forcedSerial?: number,
+): number | null {
+	const stmt = getDb().prepare(
+		`INSERT OR IGNORE INTO user_unlocks (user_id, item_type, item_id, serial)
+		 VALUES (?, ?, ?, ?) RETURNING serial`,
+	);
+	for (let attempt = 0; attempt < 8; attempt++) {
+		const serial = forcedSerial ?? 1 + Math.floor(Math.random() * SERIAL_SPACE);
+		try {
+			const row = stmt.get(userId, itemType, itemId, serial) as { serial: number } | undefined;
+			return row?.serial ?? null;
+		} catch {
+			if (forcedSerial !== undefined) throw new Error("Serial already minted for this item");
+			// serial collision against idx_unlock_serial — mint a new number
+		}
+	}
+	return null;
 }
 
 export type UserUnlock = {
@@ -634,6 +671,83 @@ export function transferUnlock(buyerId: number, itemType: string, itemId: number
 			"UPDATE user_unlocks SET user_id = ?, listed_price = NULL WHERE item_type = ? AND item_id = ? AND serial = ?",
 		)
 		.run(buyerId, itemType, itemId, serial);
+}
+
+// --- Custom cosmetics (admin-created catalog entries) ---
+
+export type CustomCosmeticRow = {
+	id: number;
+	type: string;
+	name: string;
+	chance: number;
+	price: number | null;
+	hide: number;
+	image: string;
+	created_at: string;
+};
+
+export function getCustomCosmeticRows(): CustomCosmeticRow[] {
+	return getDb()
+		.prepare("SELECT * FROM custom_cosmetics ORDER BY id")
+		.all() as CustomCosmeticRow[];
+}
+
+export function insertCustomCosmetic(row: {
+	type: string;
+	name: string;
+	chance: number;
+	price: number | null;
+	hide: number;
+	image: string;
+}): number {
+	const res = getDb()
+		.prepare(
+			"INSERT INTO custom_cosmetics (type, name, chance, price, hide, image) VALUES (?, ?, ?, ?, ?, ?)",
+		)
+		.run(row.type, row.name, row.chance, row.price, row.hide, row.image);
+	return Number(res.lastInsertRowid);
+}
+
+export function deleteCustomCosmeticRow(id: number): CustomCosmeticRow | undefined {
+	const row = getDb().prepare("SELECT * FROM custom_cosmetics WHERE id = ?").get(id) as
+		| CustomCosmeticRow
+		| undefined;
+	if (row) {
+		getDb().prepare("DELETE FROM custom_cosmetics WHERE id = ?").run(id);
+	}
+	return row;
+}
+
+export function setUserKr(userId: number, kr: number): void {
+	getDb().prepare("UPDATE player_stats SET kr = ? WHERE user_id = ?").run(kr, userId);
+}
+
+// --- Per-mode map rotation overrides (admin picks which maps rotate) ---
+
+export function getModeMapOverrides(): Map<string, number[]> {
+	const rows = getDb().prepare("SELECT mode, maps FROM mode_map_rotation").all() as {
+		mode: string;
+		maps: string;
+	}[];
+	return new Map(
+		rows.map((r) => {
+			let maps: number[] = [];
+			try {
+				maps = JSON.parse(r.maps);
+			} catch {}
+			return [r.mode, maps];
+		}),
+	);
+}
+
+export function setModeMapOverride(mode: string, maps: number[] | null): void {
+	if (maps === null) {
+		getDb().prepare("DELETE FROM mode_map_rotation WHERE mode = ?").run(mode);
+	} else {
+		getDb()
+			.prepare("INSERT OR REPLACE INTO mode_map_rotation (mode, maps) VALUES (?, ?)")
+			.run(mode, JSON.stringify(maps));
+	}
 }
 
 // --- Reward crate queries ---
@@ -1484,6 +1598,7 @@ export type AdminUserRow = {
 	score: number;
 	kills: number;
 	deaths: number;
+	kr: number;
 	total_damage: number;
 	first_seen: number;
 	last_seen: number;
@@ -1511,7 +1626,7 @@ export function getAdminUsers(limit: number, offset: number, search?: string): A
 	return getDb()
 		.prepare(
 			`SELECT u.id, u.username, u.discord_username, u.discord_avatar, u.created_at, u.role,
-					COALESCE(ps.score, 0) AS score, COALESCE(ps.kills, 0) AS kills,
+					COALESCE(ps.score, 0) AS score, COALESCE(ps.kills, 0) AS kills, COALESCE(ps.kr, 0) AS kr,
 					COALESCE(ps.deaths, 0) AS deaths, COALESCE(ps.total_damage, 0) AS total_damage,
 					COALESCE(ua.first_seen, 0) AS first_seen, COALESCE(ua.last_seen, 0) AS last_seen,
 					COALESCE(ua.session_count, 0) AS session_count,
@@ -1564,7 +1679,7 @@ export function getAdminUserById(id: number): AdminUserRow | undefined {
 	return getDb()
 		.prepare(
 			`SELECT u.id, u.username, u.discord_username, u.discord_avatar, u.created_at, u.role,
-					COALESCE(ps.score, 0) AS score, COALESCE(ps.kills, 0) AS kills,
+					COALESCE(ps.score, 0) AS score, COALESCE(ps.kills, 0) AS kills, COALESCE(ps.kr, 0) AS kr,
 					COALESCE(ps.deaths, 0) AS deaths, COALESCE(ps.total_damage, 0) AS total_damage,
 					COALESCE(ua.first_seen, 0) AS first_seen, COALESCE(ua.last_seen, 0) AS last_seen,
 					COALESCE(ua.session_count, 0) AS session_count,

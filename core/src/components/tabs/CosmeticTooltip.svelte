@@ -56,7 +56,7 @@
 <span bind:this={anchor} style="display:none"></span>
 {#if pos}
 	<div class="hoverTooltip fixedTip" use:portal style:left={`${pos.x}px`} style:top={`${pos.y}px`}>
-		<img class={`${type}DisplayImage`} src={`/images/${type}s/${item.id}/d.png`}>
+		<img class={`${type}DisplayImage`} src={(item as { image?: string }).image ?? `/images/${type}s/${item.id}/d.png`}>
 		<div style:color={getItemRarityColor(item.chance)} style:font-size={"16px"} style:margin-top={"5px"}>{item.name}</div>
 		<div style="color: #ffd100; font-size: 12px; margin-top: 0px">droprate {item.chance}%</div>
 		<div style="font-size: 8px; color: #d8d8d8; margin-top: 1px">

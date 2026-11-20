@@ -221,6 +221,60 @@ window.addEventListener("message", (event) => {
 	}
 });
 
+// admin-created cosmetics live server-side; pull them into the local catalogs
+// so they show in the loadout before any room join (rooms re-send the merged
+// catalogs via updHt/updShrt/updCmo anyway)
+type CustomCosmetic = {
+	id: number;
+	type: "hat" | "shirt" | "camo" | "spray";
+	name: string;
+	chance: number;
+	price: number | null;
+	hide: boolean;
+	image: string;
+};
+async function loadCustomCosmetics() {
+	try {
+		const resp = await fetch("/api/customCosmetics");
+		if (!resp.ok) return;
+		const { items } = (await resp.json()) as { items: CustomCosmetic[] };
+		for (const item of items) {
+			if (item.hide) continue;
+			if (item.type === "spray") {
+				if (!st.sprays.some((s) => s.id === item.id)) {
+					st.sprays.push({
+						id: item.id,
+						name: item.name,
+						src: item.image,
+						image: item.image,
+						info: { scale: 64, alpha: 1, resolution: 30 },
+					} as (typeof st.sprays)[number]);
+				}
+			} else if (item.type === "camo") {
+				if (!st.cosmetics.camos[0].some((c) => c.id === item.id)) {
+					(st.cosmetics.camos[0] as { id: number; name: string; chance: number; image?: string }[]).push({
+						id: item.id,
+						name: item.name,
+						chance: item.chance,
+						image: item.image,
+					});
+				}
+			} else {
+				const list = (item.type === "hat" ? st.cosmetics.hats : st.cosmetics.shirts) as {
+					id: number;
+					name: string;
+					chance: number;
+					image?: string;
+				}[];
+				if (!list.some((c) => c.id === item.id)) {
+					list.push({ id: item.id, name: item.name, chance: item.chance, image: item.image });
+				}
+			}
+		}
+	} catch {}
+}
+void loadCustomCosmetics();
+
 // pick up the session cookie without reloading: apply the account to the UI and,
 // when safely in the menu, reconnect the room socket so its handshake (which is
 // what ties round stats to the account) carries the fresh session
@@ -2804,7 +2858,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 				hat.imgToLoad++;
 				hat.lS.index = spriteIndex;
 				spriteIndex++;
-				hat.lS.src = `/images/hats/${tmpAcc.hat.id}/l.png`;
+				hat.lS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/l.png`;
 				hat.lS.onload = () => {
 					hat.imgToLoad--;
 					hat.lS.isLoaded = true;
@@ -2813,7 +2867,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 				hat.imgToLoad++;
 				hat.rS.index = spriteIndex;
 				spriteIndex++;
-				hat.rS.src = `/images/hats/${tmpAcc.hat.id}/l.png`;
+				hat.rS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/l.png`;
 				hat.rS.onload = () => {
 					hat.rS = flipSprite(hat.rS, true);
 					hat.imgToLoad--;
@@ -2825,7 +2879,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 				hat.imgToLoad++;
 				hat.uS.index = spriteIndex;
 				spriteIndex++;
-				hat.uS.src = `/images/hats/${tmpAcc.hat.id}/u.png`;
+				hat.uS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/u.png`;
 				hat.uS.onload = () => {
 					hat.imgToLoad--;
 					hat.uS.isLoaded = true;
@@ -2835,7 +2889,7 @@ function getHatSprite(playerObj: Player, dir: number) {
 			hat.imgToLoad++;
 			hat.dS.index = spriteIndex;
 			spriteIndex++;
-			hat.dS.src = `/images/hats/${tmpAcc.hat.id}/d.png`;
+			hat.dS.src = tmpAcc.hat.image ?? `/images/hats/${tmpAcc.hat.id}/d.png`;
 			hat.dS.onload = () => {
 				hat.imgToLoad--;
 				hat.dS.isLoaded = true;
@@ -2892,7 +2946,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 			d.lS = new Image() as Sprite;
 			d.lS.index = spriteIndex;
 			spriteIndex++;
-			d.lS.src = `/images/shirts/${tmpAcc.shirt.id}/l.png`;
+			d.lS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/l.png`;
 			d.lS.onload = () => {
 				d.imgToLoad--;
 				d.lS.isLoaded = true;
@@ -2902,7 +2956,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 			d.rS = new Image() as Sprite;
 			d.rS.index = spriteIndex;
 			spriteIndex++;
-			d.rS.src = `/images/shirts/${tmpAcc.shirt.id}/l.png`;
+			d.rS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/l.png`;
 			d.rS.onload = () => {
 				d.rS = flipSprite(d.rS, true);
 				d.imgToLoad--;
@@ -2915,7 +2969,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 			d.uS = new Image() as Sprite;
 			d.uS.index = spriteIndex;
 			spriteIndex++;
-			d.uS.src = `/images/shirts/${tmpAcc.shirt.id}/u.png`;
+			d.uS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/u.png`;
 			d.uS.onload = () => {
 				d.imgToLoad--;
 				d.uS.isLoaded = true;
@@ -2926,7 +2980,7 @@ function getShirtSprite(playerObj: Player, dir: number) {
 		d.dS = new Image() as Sprite;
 		d.dS.index = spriteIndex;
 		spriteIndex++;
-		d.dS.src = `/images/shirts/${tmpAcc.shirt.id}/d.png`;
+		d.dS.src = tmpAcc.shirt.image ?? `/images/shirts/${tmpAcc.shirt.id}/d.png`;
 		d.dS.onload = () => {
 			d.imgToLoad--;
 			d.dS.isLoaded = true;
@@ -2995,7 +3049,11 @@ function getWeaponSprite(weaponIndex: number, camo: number, angle: number) {
 				ctx.drawImage(flip ? flipSprite(img, true) : img, 0, 0, img.width, img.height);
 				cachedWeaponSprites[tmpIndex] = canvas;
 			};
-			img.src = `/images/camos/${camo + 1}.png`;
+			// custom camos carry their own image URL (id-derived path won't exist)
+			const camoEntry = st.cosmetics.camos[0]?.find((c) => c.id === camo + 1) as
+				| { image?: string }
+				| undefined;
+			img.src = camoEntry?.image ?? `/images/camos/${camo + 1}.png`;
 		}
 	}
 	return cachedWeaponSprites[tmpIndex];

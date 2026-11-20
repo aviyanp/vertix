@@ -6,6 +6,7 @@ import { characterClasses } from "core/src/loadouts.ts";
 import type { Projectile } from "core/src/logic/projectile.ts";
 import { camos, hats, shirts } from "core/src/skins.ts";
 import { sprays } from "core/src/sprays.ts";
+import { allItems, CUSTOM_ID_BASE } from "./customItems.ts";
 import type { PickupObject, Player, ZoneEvent } from "core/src/types.ts";
 import {
 	dotInRect,
@@ -632,12 +633,15 @@ export class Room {
 			});
 			socket.on("cSpray", (id) => {
 				if (!cosmeticRateLimiter(socket.id)) return;
-				const spray = sprays.find((s) => s.id === id);
-				// market-exclusive sprays need the unlock; every other spray is free
-				const needsUnlock = spray && marketSprayPrice(spray.id) !== null;
+				const spray = allItems("spray").find((s) => s.id === id) as
+					| (typeof sprays)[number] & { image?: string }
+					| undefined;
+				// market-exclusive and custom sprays need the unlock; the rest are free
+				const needsUnlock =
+					spray && (spray.id >= CUSTOM_ID_BASE || marketSprayPrice(spray.id) !== null);
 				if (spray && (!needsUnlock || (authSocket.userId && hasUnlock(authSocket.userId, "spray", spray.id)))) {
 					player.spray = {
-						src: `/images/sprays/${id}.png`,
+						src: spray.image ?? `/images/sprays/${id}.png`,
 						...spray,
 					};
 				}
@@ -1394,6 +1398,7 @@ export class Room {
 				type: best.type,
 				name: best.name,
 				chance: best.chance,
+				image: best.image,
 				isDuplicate: false,
 			};
 			this.io.emit("upd", { i: pl.index, li: pl.lastItem });
@@ -1933,7 +1938,9 @@ export class Room {
 	}
 
 	sortCosmetics() {
-		this.cosmetics.hats = hats
+		// allItems merges admin-created custom cosmetics into the static catalogs;
+		// they carry an `image` url the client uses in place of the id-derived path
+		this.cosmetics.hats = (allItems("hat") as (typeof hats)[number][])
 			.filter((h) => !h.hide)
 			.map((h) => ({
 				id: h.id,
@@ -1945,10 +1952,11 @@ export class Room {
 				left: h.left,
 				up: h.up,
 				nameY: h.nameY,
+				image: (h as { image?: string }).image,
 			}))
 			.toSorted((a, b) => a.chance - b.chance);
 
-		this.cosmetics.shirts = shirts
+		this.cosmetics.shirts = (allItems("shirt") as (typeof shirts)[number][])
 			.filter((h) => !h.hide)
 			.map((s) => ({
 				id: s.id,
@@ -1958,16 +1966,18 @@ export class Room {
 				count: 0,
 				left: s.left,
 				up: s.up,
+				image: (s as { image?: string }).image,
 			}))
 			.toSorted((a, b) => a.chance - b.chance);
 
-		this.cosmetics.camos = camos
+		this.cosmetics.camos = (allItems("camo") as (typeof camos)[number][])
 			.filter((h) => !h.hide)
 			.map((p) => ({
 				id: p.id,
 				name: p.name,
 				chance: p.chance,
 				count: 0,
+				image: (p as { image?: string }).image,
 			}))
 			.toSorted((a, b) => a.chance - b.chance);
 	}

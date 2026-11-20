@@ -1,4 +1,5 @@
 import { camos, hats, shirts } from "core/src/skins.ts";
+import { allItems } from "./customItems.ts";
 import {
 	getMilestoneGrants,
 	getUserUnlocks,
@@ -36,7 +37,7 @@ export type DropItemType = Exclude<UnlockItemType, "spray">;
 
 // carries type+id as well as the display fields so callers can render the item's
 // image and tooltip (the scoreboard's "Last Reward" cell needs all four)
-export type UnlockedItem = { type: DropItemType; id: number; name: string; chance: number; serial?: number };
+export type UnlockedItem = { type: DropItemType; id: number; name: string; chance: number; serial?: number; image?: string };
 
 /**
  * Grants any hat/shirt/camo unlocks the player's lifetime score newly
@@ -53,13 +54,14 @@ export function checkForNewUnlocks(userId: number, lifetimeScore: number): Unloc
 	const resolved = new Set(getMilestoneGrants(userId).map((s) => `${s.item_type}:${s.item_id}`));
 
 	for (const [type, catalog] of [
-		["hat", hats],
-		["shirt", shirts],
-		["camo", camos],
+		["hat", allItems("hat")],
+		["shirt", allItems("shirt")],
+		["camo", allItems("camo")],
 	] as const) {
 		for (const item of catalog) {
-			if (item.chance <= 0 || item.hide || resolved.has(`${type}:${item.id}`)) continue;
-			if (lifetimeScore < thresholdForChance(item.chance)) continue;
+			if ((item.chance ?? 0) <= 0 || item.hide || resolved.has(`${type}:${item.id}`)) continue;
+			if (lifetimeScore < thresholdForChance(item.chance ?? 0)) continue;
+
 			// already owned via market/drop: the milestone resolves as consumed
 			// with no duplicate. Unowned: resolve only when the grant lands, so
 			// a failed write leaves the milestone pending instead of losing it.
@@ -70,7 +72,7 @@ export function checkForNewUnlocks(userId: number, lifetimeScore: number): Unloc
 			const serial = grantUnlock(userId, type, item.id);
 			if (serial !== null) {
 				recordMilestoneGrant(userId, type, item.id);
-				newlyUnlocked.push({ type, id: item.id, name: item.name, chance: item.chance, serial });
+				newlyUnlocked.push({ type, id: item.id, name: item.name, chance: item.chance ?? 0, serial, image: (item as { image?: string }).image });
 			}
 		}
 	}
@@ -78,13 +80,10 @@ export function checkForNewUnlocks(userId: number, lifetimeScore: number): Unloc
 	return newlyUnlocked;
 }
 
-const CATALOGS: Record<
-	DropItemType,
-	{ id: number; name: string; chance: number; hide?: boolean }[]
-> = {
-	hat: hats,
-	shirt: shirts,
-	camo: camos,
+const CATALOGS: Record<DropItemType, () => { id: number; name: string; chance?: number; hide?: boolean }[]> = {
+	hat: () => allItems("hat"),
+	shirt: () => allItems("shirt"),
+	camo: () => allItems("camo"),
 };
 
 /**
@@ -98,11 +97,11 @@ export function getUserUnlockedItems(
 	const items: { type: UnlockItemType; name: string; chance: number }[] = [];
 	for (const unlock of getUserUnlocks(userId)) {
 		// spray unlocks have no rarity catalog entry — they render via sprays.ts
-		const catalog = (CATALOGS as Partial<Record<UnlockItemType, (typeof CATALOGS)[DropItemType]>>)[
+		const catalog = (CATALOGS as Partial<Record<UnlockItemType, () => { id: number; name: string; chance?: number }[]>>)[
 			unlock.item_type
 		];
-		const item = catalog?.find((i) => i.id === unlock.item_id);
-		if (item) items.push({ type: unlock.item_type, name: item.name, chance: item.chance });
+		const item = catalog?.().find((i) => i.id === unlock.item_id);
+		if (item) items.push({ type: unlock.item_type, name: item.name, chance: item.chance ?? 0 });
 	}
 	return items.sort((a, b) => a.chance - b.chance);
 }
@@ -111,16 +110,18 @@ export function getUserUnlockedItems(
  * Every cosmetic the user doesn't own yet, with `weight` pre-populated from
  * the catalog's rarity `chance` so a caller can tilt the roll.
  */
-function unownedDropPool(userId: number): { itemType: DropItemType; id: number; name: string; chance: number; weight: number }[] {
+type DropPoolEntry = { itemType: DropItemType; id: number; name: string; chance: number; weight: number; image?: string };
+function unownedDropPool(userId: number): DropPoolEntry[] {
 	const owned = new Set(getUserUnlocks(userId).map((u) => `${u.item_type}:${u.item_id}`));
-	const pool: { itemType: DropItemType; id: number; name: string; chance: number; weight: number }[] = [];
+	const pool: DropPoolEntry[] = [];
 	for (const itemType of Object.keys(CATALOGS) as DropItemType[]) {
-		for (const item of CATALOGS[itemType]) {
+		for (const item of CATALOGS[itemType]()) {
+			const chance = item.chance ?? 0;
 			// hidden items (e.g. Bones) never render in the loadout picker, so
 			// awarding one hands the player a cosmetic they can never equip
-			if (item.chance <= 0 || item.hide) continue;
+			if (chance <= 0 || item.hide) continue;
 			if (owned.has(`${itemType}:${item.id}`)) continue;
-			pool.push({ itemType, id: item.id, name: item.name, chance: item.chance, weight: item.chance });
+			pool.push({ itemType, id: item.id, name: item.name, chance, weight: chance, image: (item as { image?: string }).image });
 		}
 	}
 	return pool;
@@ -129,7 +130,7 @@ function unownedDropPool(userId: number): { itemType: DropItemType; id: number; 
 /** Weighted pick from the pool, grants the chosen item, returns it (null on empty pool). */
 function rollDropFromPool(
 	userId: number,
-	pool: { itemType: DropItemType; id: number; name: string; chance: number; weight: number }[],
+	pool: DropPoolEntry[],
 ): UnlockedItem | null {
 	if (pool.length === 0) return null;
 	const totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
@@ -143,7 +144,7 @@ function rollDropFromPool(
 		}
 	}
 	const serial = grantUnlock(userId, chosen.itemType, chosen.id) ?? undefined;
-	return { type: chosen.itemType, id: chosen.id, name: chosen.name, chance: chosen.chance, serial };
+	return { type: chosen.itemType, id: chosen.id, name: chosen.name, chance: chosen.chance, serial, image: chosen.image };
 }
 
 /**

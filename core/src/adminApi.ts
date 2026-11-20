@@ -38,7 +38,7 @@ export class ApiError extends Error {
 	}
 }
 
-async function request<T>(path: string, method: "GET" | "POST", body?: unknown): Promise<T> {
+async function request<T>(path: string, method: "GET" | "POST" | "DELETE", body?: unknown): Promise<T> {
 	const headers: Record<string, string> = {};
 	const token = getAdminToken();
 	if (token) headers.Authorization = `Bearer ${token}`;
@@ -64,6 +64,7 @@ async function request<T>(path: string, method: "GET" | "POST", body?: unknown):
 export const adminApi = {
 	get: <T>(path: string) => request<T>(path, "GET"),
 	post: <T>(path: string, body?: unknown) => request<T>(path, "POST", body ?? {}),
+	del: <T>(path: string) => request<T>(path, "DELETE"),
 };
 
 // --- shared overview types (AdminApp polls, panels consume) --------------------

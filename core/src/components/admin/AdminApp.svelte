@@ -17,8 +17,9 @@
 	import ReportsPanel from "./ReportsPanel.svelte";
 	import AuditPanel from "./AuditPanel.svelte";
 	import ServerPanel from "./ServerPanel.svelte";
+	import MakerPanel from "./MakerPanel.svelte";
 
-	type Tab = "overview" | "rooms" | "accounts" | "moderation" | "reports" | "audit" | "server";
+	type Tab = "overview" | "rooms" | "accounts" | "maker" | "moderation" | "reports" | "audit" | "server";
 
 	type Overview = AdminOverview;
 
@@ -26,6 +27,7 @@
 		{ id: "overview", label: "OVERVIEW" },
 		{ id: "rooms", label: "ROOMS" },
 		{ id: "accounts", label: "ACCOUNTS" },
+		{ id: "maker", label: "MAKER" },
 		{ id: "moderation", label: "BANS & MUTES" },
 		{ id: "reports", label: "REPORTS" },
 		{ id: "audit", label: "AUDIT" },
@@ -144,6 +146,8 @@
 			<RoomsPanel {overview} onError={(m) => (actionError = m)} />
 		{:else if tab === "accounts"}
 			<AccountsPanel onError={(m) => (actionError = m)} />
+		{:else if tab === "maker"}
+			<MakerPanel onError={(m) => (actionError = m)} />
 		{:else if tab === "moderation"}
 			<ModerationPanel onError={(m) => (actionError = m)} />
 		{:else if tab === "reports"}

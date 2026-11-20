@@ -5,9 +5,10 @@
  * copy individually ownable and listable.
  */
 import { KR_SELLBACK, krPriceForChance, marketSprayPrice } from "core/src/market.ts";
-import { camos, hats, shirts } from "core/src/skins.ts";
+import { hats, shirts } from "core/src/skins.ts";
 import { sprays } from "core/src/sprays.ts";
 import { getCosmeticImageUrl } from "core/src/utils.ts";
+import { allItems, CUSTOM_ID_BASE } from "./customItems.ts";
 import {
 	addKr,
 	deleteUnlock,
@@ -28,14 +29,17 @@ import {
 } from "./db.ts";
 
 function officialPrice(type: string, id: number): number | null {
-	if (type === "hat" || type === "shirt" || type === "camo") {
-		const catalog = type === "hat" ? hats : type === "shirt" ? shirts : camos;
-		const item = catalog.find((i) => i.id === id);
+	if (type === "hat" || type === "shirt" || type === "camo" || type === "spray") {
+		const item = allItems(type as UnlockItemType).find((i) => i.id === id);
 		// hidden items can't be equipped — same rule as the drop pool
 		if (!item || item.hide) return null;
-		return krPriceForChance(item.chance);
+		if (id >= CUSTOM_ID_BASE) {
+			// custom items: explicit admin price, or rarity-derived
+			return item.price ?? krPriceForChance(item.chance ?? 5);
+		}
+		if (type === "spray") return marketSprayPrice(id);
+		return krPriceForChance(item.chance ?? 0);
 	}
-	if (type === "spray") return marketSprayPrice(id);
 	return null;
 }
 
@@ -73,20 +77,21 @@ export function getMarketPageData(userId: number | undefined): MarketPageData {
 	const owned = userId ? new Map(getUserUnlocks(userId).map((u) => [`${u.item_type}:${u.item_id}`, u])) : new Map();
 
 	for (const [type, catalog] of [
-		["hat", hats],
-		["shirt", shirts],
-		["camo", camos],
+		["hat", allItems("hat")],
+		["shirt", allItems("shirt")],
+		["camo", allItems("camo")],
 	] as const) {
 		for (const item of catalog) {
 			if (item.hide) continue;
-			const price = krPriceForChance(item.chance);
+			const price = officialPrice(type, item.id);
+			if (price === null) continue;
 			const s = stats.get(`${type}:${item.id}`);
 			items.push({
 				type,
 				id: item.id,
 				name: item.name,
-				chance: item.chance,
-				image: getCosmeticImageUrl(type, item.id),
+				chance: item.chance ?? null,
+				image: item.image ?? getCosmeticImageUrl(type, item.id),
 				officialPrice: price,
 				sellPrice: sellPrice(price),
 				minted: s?.minted ?? 0,
@@ -95,16 +100,16 @@ export function getMarketPageData(userId: number | undefined): MarketPageData {
 			});
 		}
 	}
-	for (const spray of sprays) {
-		const price = marketSprayPrice(spray.id);
-		if (price === null) continue; // free sprays aren't market items
+	for (const spray of allItems("spray") as ((typeof sprays)[number] & { image?: string; hide?: boolean })[]) {
+		const price = officialPrice("spray", spray.id);
+		if (price === null || spray.hide) continue; // free sprays aren't market items
 		const s = stats.get(`spray:${spray.id}`);
 		items.push({
 			type: "spray",
 			id: spray.id,
 			name: spray.name,
 			chance: null,
-			image: `/images/sprays/${spray.id}.png`,
+			image: spray.image ?? `/images/sprays/${spray.id}.png`,
 			officialPrice: price,
 			sellPrice: sellPrice(price),
 			minted: s?.minted ?? 0,

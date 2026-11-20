@@ -53,6 +53,7 @@ import {
 	listMarketItem,
 	sellMarketItem,
 } from "./market.ts";
+import { customImageFile, getCustomCosmetics } from "./customItems.ts";
 import { isMaintenanceEnabled } from "./server-ops.ts";
 import { writeServerStat, pruneServerStats } from "./db.ts";
 import {
@@ -584,6 +585,22 @@ api.post("/market/trade", async (c) => {
 							)
 							: { success: false, error: "Bad action" };
 	return c.json(result, result.success ? 200 : 400);
+});
+
+// --- custom cosmetics (admin-made catalog entries) ---
+api.get("/customCosmetics", (c) => {
+	return c.json({
+		items: getCustomCosmetics().map(({ rowid, ...i }) => ({ ...i, rowid })),
+	});
+});
+
+api.get("/customCosmeticImg/:file", (c) => {
+	const rowid = parseInt(c.req.param("file").replace(/\.png$/, ""), 10);
+	const file = customImageFile(rowid);
+	if (!file) return c.notFound();
+	c.header("Content-Type", "image/png");
+	c.header("Cache-Control", "public, max-age=60");
+	return c.body(fs.readFileSync(file));
 });
 
 // root app: API mounted under /api, static files (production) at /

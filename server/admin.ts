@@ -1,6 +1,8 @@
 import { Hono, type Context } from "hono";
 import { timingSafeEqual } from "node:crypto";
 import { Buffer } from "node:buffer";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import type { Server } from "socket.io";
 import { rooms, Room, createPermanentRoom } from "./room.ts";
 import {
@@ -43,8 +45,19 @@ import {
 	deleteUnlock,
 	resetStats,
 	setScore,
+	setUserKr,
+	getModeMapOverrides,
+	setModeMapOverride,
 } from "./db.ts";
 import { log, formatDuration, setLogLevel, type LogLevel } from "./log.ts";
+import { gameModes } from "core/src/gamemodes.ts";
+import { addMapBuffer, defaultGenData } from "./maps.ts";
+import {
+	createCustomCosmetic,
+	deleteCustomCosmetic,
+	getCustomCosmetics,
+} from "./customItems.ts";
+import { addKr } from "./db.ts";
 import { createRateLimiter, httpClientIp } from "./security.ts";
 import { validateSession } from "./session.ts";
 import { isMaintenanceEnabled, setMaintenance } from "./server-ops.ts";
@@ -605,6 +618,95 @@ export function createAdminRoutes(io: Server): Hono<AdminEnv> {
 		return c.json({ ok: true });
 	});
 
+	// ---- maker: admin-created cosmetics ----
+
+	app.post("/customCosmetics", async (c) => {
+		const actor = permit(c, "accountEdit");
+		if (actor instanceof Response) return actor;
+		const body = await c.req.json().catch(() => ({}));
+		if (typeof body.png !== "string" || body.png.length > 800_000) {
+			return bad(c, "png (base64) required, 600KB max");
+		}
+		try {
+			const item = await createCustomCosmetic({
+				type: body.type,
+				name: String(body.name ?? ""),
+				chance: Number(body.chance) || 5,
+				price: body.price === undefined || body.price === null || body.price === "" ? null : Number(body.price),
+				hide: !!body.hide,
+				png: Buffer.from(body.png.replace(/^data:[^,]*,/, ""), "base64"),
+			});
+			audited(c, actor, "createCustomCosmetic", item.name, { id: item.id, type: item.type });
+			return c.json({ ok: true, item });
+		} catch (e) {
+			return bad(c, e instanceof Error ? e.message : "create failed");
+		}
+	});
+
+	app.delete("/customCosmetics/:rowid", (c) => {
+		const actor = permit(c, "accountEdit");
+		if (actor instanceof Response) return actor;
+		const rowid = intParam(c.req.param("rowid"));
+		if (!rowid) return bad(c, "Invalid id");
+		if (!deleteCustomCosmetic(rowid)) return bad(c, "Not found");
+		audited(c, actor, "deleteCustomCosmetic", `row:${rowid}`);
+		return c.json({ ok: true });
+	});
+
+	// ---- maker: map upload (PNG pixel editor output) ----
+
+	app.post("/maps", async (c) => {
+		const actor = permit(c, "serverManage");
+		if (actor instanceof Response) return actor;
+		const body = await c.req.json().catch(() => ({}));
+		if (typeof body.png !== "string" || body.png.length > 800_000) {
+			return bad(c, "png (base64) required");
+		}
+		try {
+			const png = Buffer.from(body.png.replace(/^data:[^,]*,/, ""), "base64");
+			// persisted under its index so the pool order stays identical on restart
+			const { mapIndex, width, height } = await addMapBuffer(png, String(defaultGenData.length));
+			if (width < 8 || width > 64 || height < 8 || height > 64) {
+				defaultGenData.pop();
+				rmSync(join(import.meta.dirname, "maps", `${mapIndex}.png`), { force: true });
+				return bad(c, `Map must be 8-64 tiles per side (got ${width}x${height})`);
+			}
+			audited(c, actor, "createMap", `map:${mapIndex}`, { width, height });
+			return c.json({ ok: true, mapIndex, width, height });
+		} catch (e) {
+			return bad(c, e instanceof Error ? e.message : "upload failed");
+		}
+	});
+
+	app.get("/maker", (c) => {
+		const actor = permit(c, "accountEdit");
+		if (actor instanceof Response) return actor;
+		return c.json({
+			customs: getCustomCosmetics(),
+			mapCount: defaultGenData.length,
+			rotations: Object.fromEntries(getModeMapOverrides()),
+		});
+	});
+
+	app.post("/modeMaps", async (c) => {
+		const actor = permit(c, "serverManage");
+		if (actor instanceof Response) return actor;
+		const body = await c.req.json().catch(() => ({}));
+		const mode = String(body.mode ?? "");
+		if (!gameModes.some((m) => m.name === mode)) return bad(c, "Unknown mode");
+		if (body.maps === null) {
+			setModeMapOverride(mode, null);
+			audited(c, actor, "resetModeMaps", mode);
+			return c.json({ ok: true });
+		}
+		if (!Array.isArray(body.maps) || !body.maps.every((i: unknown) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < defaultGenData.length)) {
+			return bad(c, `maps must be integers 0..${defaultGenData.length - 1}`);
+		}
+		setModeMapOverride(mode, body.maps);
+		audited(c, actor, "setModeMaps", mode, { maps: body.maps });
+		return c.json({ ok: true });
+	});
+
 	app.post("/accounts/:id/unlock", async (c) => {
 		const actor = permit(c, "accountEdit");
 		if (actor instanceof Response) return actor;
@@ -614,18 +716,50 @@ export function createAdminRoutes(io: Server): Hono<AdminEnv> {
 		const itemType = body.itemType;
 		const itemId = Number(body.itemId);
 		if (
-			(itemType !== "hat" && itemType !== "shirt" && itemType !== "camo") ||
+			(itemType !== "hat" && itemType !== "shirt" && itemType !== "camo" && itemType !== "spray") ||
 			!Number.isInteger(itemId) || itemId <= 0
 		) {
-			return bad(c, "itemType must be hat/shirt/camo and itemId a positive integer");
+			return bad(c, "itemType must be hat/shirt/camo/spray and itemId a positive integer");
 		}
 		if (body.grant === false) {
 			deleteUnlock(id, itemType, itemId);
 			audited(c, actor, "revokeUnlock", `user:${id}`, { itemType, itemId });
 		} else {
-			grantUnlock(id, itemType, itemId);
-			audited(c, actor, "grantUnlock", `user:${id}`, { itemType, itemId });
+			const serial =
+				body.serial !== undefined && body.serial !== null && body.serial !== ""
+					? Number(body.serial)
+					: undefined;
+			if (serial !== undefined && (!Number.isInteger(serial) || serial <= 0)) {
+				return bad(c, "serial must be a positive integer");
+			}
+			try {
+				const minted = grantUnlock(id, itemType, itemId, serial);
+				audited(c, actor, "grantUnlock", `user:${id}`, { itemType, itemId, serial });
+				return c.json({ ok: true, serial: minted });
+			} catch (e) {
+				return bad(c, e instanceof Error ? e.message : "grant failed");
+			}
 		}
+		return c.json({ ok: true });
+	});
+
+	app.post("/accounts/:id/kr", async (c) => {
+		const actor = permit(c, "accountEdit");
+		if (actor instanceof Response) return actor;
+		const id = intParam(c.req.param("id"));
+		if (!id) return bad(c, "Invalid id");
+		const body = await c.req.json().catch(() => ({}));
+		if (body.value !== undefined) {
+			const value = Number(body.value);
+			if (!Number.isInteger(value) || value < 0) return bad(c, "value must be a non-negative integer");
+			setUserKr(id, value);
+			audited(c, actor, "setKr", `user:${id}`, { value });
+			return c.json({ ok: true });
+		}
+		const delta = Math.trunc(Number(body.delta) || 0);
+		if (!delta) return bad(c, "Provide value or delta");
+		addKr(id, delta);
+		audited(c, actor, "adjustKr", `user:${id}`, { delta });
 		return c.json({ ok: true });
 	});
 

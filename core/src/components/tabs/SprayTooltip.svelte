@@ -48,7 +48,7 @@
 <span bind:this={anchor} style="display:none"></span>
 {#if pos}
 	<div class="hoverTooltip fixedTip" use:portal style:left={`${pos.x}px`} style:top={`${pos.y}px`}>
-		<img class="sprayDisplayImage" src={`/images/sprays/${props.spray.id}.png`}>
+		<img class="sprayDisplayImage" src={(props.spray as { image?: string }).image ?? `/images/sprays/${props.spray.id}.png`}>
 	</div>
 {/if}
 

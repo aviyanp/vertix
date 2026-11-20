@@ -11,6 +11,7 @@
 		score: number;
 		kills: number;
 		deaths: number;
+		kr: number;
 		first_seen: number;
 		last_seen: number;
 		session_count: number;
@@ -129,6 +130,33 @@
 		act(`/accounts/${id}/score`, { score: n }, undefined);
 	}
 
+	function setKr(id: number, current: number) {
+		const input = ask(`KR: a number sets the balance, +N/-N adjusts (currently ${current}):`, String(current));
+		if (input === null) return;
+		const trimmed = input.trim();
+		const isDelta = trimmed.startsWith("+") || trimmed.startsWith("-");
+		const n = Number(trimmed);
+		if (!Number.isInteger(n) || (!isDelta && n < 0)) {
+			onError("Enter a whole number, or +N/-N to adjust");
+			return;
+		}
+		act(`/accounts/${id}/kr`, isDelta ? { delta: n } : { value: n }, undefined);
+	}
+
+	function grantItem(id: number) {
+		const type = ask("Item type: hat / shirt / camo / spray", "hat");
+		if (type === null) return;
+		const itemId = ask(`Item id to grant (custom items use ids 10000+):`);
+		if (itemId === null) return;
+		const serial = ask("Serial # (empty = random):", "");
+		if (serial === null) return;
+		act(`/accounts/${id}/unlock`, {
+			itemType: type.trim(),
+			itemId: Number(itemId),
+			serial: serial.trim() === "" ? undefined : Number(serial),
+		}, undefined);
+	}
+
 	function setRole(id: number, role: string) {
 		act(`/accounts/${id}/role`, { role }, `Set role to ${role}?`);
 	}
@@ -224,6 +252,8 @@
 			{/if}
 			<button type="button" class="adminBtn adminBtnTiny" onclick={() => rename(u.id, u.username)}>RENAME</button>
 			<button type="button" class="adminBtn adminBtnTiny" onclick={() => setScore(u.id, u.score)}>SET SCORE</button>
+			<button type="button" class="adminBtn adminBtnTiny" onclick={() => setKr(u.id, u.kr ?? 0)}>SET KR</button>
+			<button type="button" class="adminBtn adminBtnTiny" onclick={() => grantItem(u.id)}>GRANT ITEM</button>
 			<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/accounts/${u.id}/crate`, { count: 1 }, undefined)}>+CRATE</button>
 			<button type="button" class="adminBtn adminBtnTiny adminBtnDanger" onclick={() => act(`/accounts/${u.id}/resetStats`, undefined, `Reset ALL stats for ${u.username}?`)}>RESET STATS</button>
 			<button type="button" class="adminBtn adminBtnTiny" onclick={() => act(`/accounts/${u.id}/forceLogout`, undefined, `Force ${u.username} to log out?`)}>FORCE LOGOUT</button>

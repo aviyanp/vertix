@@ -150,9 +150,11 @@ export type Weapon = WeaponBase &
 		| { explodeOnDeath: false; blastRadius?: undefined }
 	);
 
-export type Hat = (typeof hats)[number] & { count?: number };
-export type Shirt = (typeof shirts)[number] & { count?: number };
-export type Camo = (typeof camos)[number] & { count?: number }[];
+// `image` is set on admin-created custom cosmetics: an absolute URL that
+// replaces the derived /images/<type>s/<id>/... paths everywhere the item renders
+export type Hat = (typeof hats)[number] & { count?: number; image?: string };
+export type Shirt = (typeof shirts)[number] & { count?: number; image?: string };
+export type Camo = (typeof camos)[number] & { count?: number; image?: string }[];
 
 export type Account = {
 	// TODO: maybe these can be refactored into a property of type PlayerProfile?
@@ -182,6 +184,7 @@ export type Spray = {
 	id: number;
 	name: string;
 	src: string;
+	image?: string;
 	info: {
 		scale: number;
 		alpha: number;
@@ -406,6 +409,7 @@ export type StatTableCellHoverInfo = {
 	type: "hat" | "shirt" | "camo";
 	name: string;
 	chance: number;
+	image?: string;
 	isDuplicate: boolean;
 	desc?: string;
 	weaponName?: string;

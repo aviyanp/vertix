@@ -13,7 +13,18 @@ import type {
 	Tile,
 } from "core/src/types.ts";
 import { getDistance, randomInt, setupMap } from "core/src/utils.ts";
+import { getModeMapOverrides } from "./db.ts";
 import { defaultGenData } from "./maps.ts";
+
+// admin-picked per-mode rotations (mode_map_rotation table); re-read on each
+// pick so maker edits take effect without a restart. Entries are validated
+// against the live map pool — a deleted map index just drops out.
+function getModeMaps(mode: (typeof gameModes)[number]): number[] {
+	const override = getModeMapOverrides()
+		.get(mode.name)
+		?.filter((i) => Number.isInteger(i) && i >= 0 && i < defaultGenData.length);
+	return override?.length ? override : mode.maps;
+}
 
 export class Game {
 	roomName = "";
@@ -49,7 +60,7 @@ export class Game {
 	constructor(name: string) {
 		this.roomName = name;
 		this.mode = gameModes[0];
-		this.mapData = this.newMap(defaultGenData[this.mode.maps[0]]);
+		this.mapData = this.newMap(defaultGenData[getModeMaps(this.mode)[0]]);
 	}
 
 	newPlayer() {
@@ -257,7 +268,8 @@ export class Game {
 		this.score.blue = 0;
 		this.score.lb = 0;
 		this.mode = gameModes[modeIndex];
-		const mapIndex = this.mode.maps[randomInt(0, this.mode.maps.length - 1)];
+		const rotation = getModeMaps(this.mode);
+		const mapIndex = rotation[randomInt(0, rotation.length - 1)];
 		this.mapData = genData
 			? this.newMap(genData)
 			: this.newMap(defaultGenData[mapIndex]);

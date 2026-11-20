@@ -972,6 +972,12 @@ function setupSocket(sock: Socket) {
 	sock.on("lb", updateLeaderboard);
 	sock.on("ts", updateTeamScores);
 	sock.on("rsd", receiveServerData);
+	// last-applied input number for THIS socket only — the roster is one shared
+	// packet now, so the per-recipient value arrives on its own event
+	sock.on("isn", (n: number) => {
+		const me = findUserByIndex(st.player.index);
+		if (me) me.isn = n;
+	});
 	sock.on("upd", updateUserValue);
 	sock.on("vt", updateVoteStats);
 	// live "who is playing" for the social hub. The lobby socket receives a
@@ -1556,13 +1562,15 @@ function updateRemoteInterpolation(frameDelta: number) {
 
 function receiveServerData(data: number[]) {
 	if (!st.gameOver) {
+		const byIndex = new Map<number, Player>();
 		st.players.forEach((obj) => {
 			obj.onScreen = false;
+			byIndex.set(obj.index, obj);
 		});
 		for (let cursor = 0; cursor < data.length; ) {
 			const packetLength = data[0 + cursor];
 			const playerIndex = data[1 + cursor];
-			const tmpUser = findUserByIndex(playerIndex);
+			const tmpUser = byIndex.get(playerIndex) ?? null;
 			if (playerIndex === st.player.index && tmpUser != null) {
 				// the local player is predicted and reconciled below, so the server's
 				// position is authoritative and applied directly
@@ -1576,12 +1584,7 @@ function receiveServerData(data: number[]) {
 					tmpUser.angle = data[4 + cursor];
 				}
 				// slot 5 is jumpY (our own jump is predicted locally, so it's ignored
-				// here); slot 6 carries this client's last-applied input number
-				if (packetLength > 6) {
-					tmpUser.isn = data[6 + cursor];
-				} else if (packetLength > 5) {
-					tmpUser.isn = data[5 + cursor];
-				}
+				// here); the last-applied input number now arrives on the "isn" event
 				tmpUser.onScreen = true;
 			} else if (tmpUser != null) {
 				// Remote players are buffered, never snapped. Assigning x/y straight

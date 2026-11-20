@@ -6,6 +6,7 @@ import { bodyLimit } from "hono/body-limit";
 import { Server, type Socket } from "socket.io";
 import fs from "fs";
 import path from "path";
+import { gzipSync } from "node:zlib";
 import Stream from "node:stream";
 import { fileURLToPath } from "url";
 import { gameModes } from "core/src/gamemodes.ts";
@@ -656,6 +657,8 @@ const MIME: Record<string, string> = {
 	".woff2": "font/woff2",
 	".zip": "application/zip",
 };
+// extensions worth pre-gzipping — already-compressed binaries gain nothing
+const COMPRESSIBLE = new Set([".html", ".js", ".css", ".json", ".svg"]);
 
 // mod packs are served in dev too (the vite dev server proxies /mods here);
 // default resolves relative to this file so it works regardless of cwd
@@ -718,8 +721,9 @@ if (process.env.NODE_ENV === "production") {
 	const distDir = path.resolve(process.cwd(), "core/dist");
 
 	// The whole dist tree is small — memoize file contents instead of hitting
-	// disk (existsSync + statSync + readFileSync) on every request.
-	const fileCache = new Map<string, { body: Buffer; type: string; cache: string }>();
+	// disk (existsSync + statSync + readFileSync) on every request, and
+	// pre-compress each asset once so gzip costs zero CPU per request.
+	const fileCache = new Map<string, { body: Buffer; gz: Buffer | null; type: string; cache: string }>();
 	const resolveAsset = (urlPath: string) => {
 		const hit = fileCache.get(urlPath);
 		if (hit) return hit;
@@ -737,9 +741,13 @@ if (process.env.NODE_ENV === "production") {
 		const inDist = path.resolve(filePath).startsWith(path.resolve(distDir) + path.sep);
 		if (!inDist || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return null;
 		const ext = path.extname(filePath);
+		const body = fs.readFileSync(filePath);
+		const type = MIME[ext] || "application/octet-stream";
 		const asset = {
-			body: fs.readFileSync(filePath),
-			type: MIME[ext] || "application/octet-stream",
+			body,
+			// only worth compressing text payloads big enough to matter
+			gz: body.length > 1024 && COMPRESSIBLE.has(ext) ? gzipSync(body) : null,
+			type,
 			// Vite emits content-hashed names under /assets — cache forever.
 			// Everything else (index.html, favicons) revalidates quickly.
 			cache: urlPath.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
@@ -754,6 +762,11 @@ if (process.env.NODE_ENV === "production") {
 		if (asset) {
 			c.header("Content-Type", asset.type);
 			c.header("Cache-Control", asset.cache);
+			if (asset.gz && c.req.header("accept-encoding")?.includes("gzip")) {
+				c.header("Content-Encoding", "gzip");
+				c.header("Vary", "Accept-Encoding");
+				return c.body(new Uint8Array(asset.gz));
+			}
 			return c.body(new Uint8Array(asset.body));
 		}
 		c.header("Content-Type", "text/html");

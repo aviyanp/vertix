@@ -717,25 +717,47 @@ app.all("/mods/*", (c) => {
 if (process.env.NODE_ENV === "production") {
 	const distDir = path.resolve(process.cwd(), "core/dist");
 
-	app.get("/*", (c) => {
-		const urlPath = new URL(c.req.url).pathname;
-		let filePath = path.join(distDir, urlPath === "/" ? "index.html" : urlPath);
-		// Extensionless paths map to their .html file when one exists — /admin is
-		// built as admin.html, and the old explicit /admin route served it without
-		// the suffix, so shared links keep working.
-		if (!path.extname(filePath) && fs.existsSync(filePath + ".html")) {
-			filePath += ".html";
+	// The whole dist tree is small — memoize file contents instead of hitting
+	// disk (existsSync + statSync + readFileSync) on every request.
+	const fileCache = new Map<string, { body: Buffer; type: string; cache: string } | null>();
+	const resolveAsset = (urlPath: string) => {
+		let cached = fileCache.get(urlPath);
+		if (cached === undefined) {
+			cached = null;
+			let filePath = path.join(distDir, urlPath === "/" ? "index.html" : urlPath);
+			// Extensionless paths map to their .html file when one exists — /admin is
+			// built as admin.html, and the old explicit /admin route served it without
+			// the suffix, so shared links keep working.
+			if (!path.extname(filePath) && fs.existsSync(filePath + ".html")) {
+				filePath += ".html";
+			}
+			// containment check: never serve a file resolved outside distDir
+			const inDist = path.resolve(filePath).startsWith(path.resolve(distDir) + path.sep);
+			if (inDist && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+				const ext = path.extname(filePath);
+				cached = {
+					body: fs.readFileSync(filePath),
+					type: MIME[ext] || "application/octet-stream",
+					// Vite emits content-hashed names under /assets — cache forever.
+					// Everything else (index.html, favicons) revalidates quickly.
+					cache: urlPath.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
+				};
+			}
+			fileCache.set(urlPath, cached);
 		}
-		// containment check: never serve a file resolved outside distDir (defense in
-		// depth — URL parsing already collapses `..`, but this makes it explicit)
-		const inDist = path.resolve(filePath).startsWith(path.resolve(distDir) + path.sep);
-		if (inDist && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-			const ext = path.extname(filePath);
-			c.header("Content-Type", MIME[ext] || "application/octet-stream");
-			return c.body(fs.readFileSync(filePath));
+		return cached;
+	};
+	const indexBody = fs.readFileSync(path.join(distDir, "index.html"));
+
+	app.get("/*", (c) => {
+		const asset = resolveAsset(new URL(c.req.url).pathname);
+		if (asset) {
+			c.header("Content-Type", asset.type);
+			c.header("Cache-Control", asset.cache);
+			return c.body(new Uint8Array(asset.body));
 		}
 		c.header("Content-Type", "text/html");
-		return c.body(fs.readFileSync(path.join(distDir, "index.html")));
+		return c.body(new Uint8Array(indexBody));
 	});
 }
 

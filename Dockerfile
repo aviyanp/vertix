@@ -1,10 +1,11 @@
+# syntax=docker/dockerfile:1
 # Stage 1: Build frontend
 FROM node:24-alpine AS frontend-build
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY core/package.json ./core/
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 COPY core/ ./core/
 # Gate the image on the client typecheck (svelte-check, 350+ files) so type errors
 # fail the build instead of shipping. The server half of `pnpm typecheck` needs
@@ -23,7 +24,7 @@ WORKDIR /app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY server/package.json ./server/
 COPY core/package.json ./core/
-RUN pnpm install --frozen-lockfile --prod
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile --prod
 
 # Stage 3: Production runtime — no compilers, no package manager, not root.
 FROM node:24-alpine AS production

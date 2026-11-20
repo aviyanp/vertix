@@ -15,6 +15,9 @@ let db: Database.Database;
 export function initDb(): void {
 	db = new Database(DB_PATH);
 	db.pragma("journal_mode = WAL");
+	// WAL already survives crashes with NORMAL; FULL only buys protection against
+	// power loss mid-commit and costs an fsync per write transaction.
+	db.pragma("synchronous = NORMAL");
 	db.pragma("foreign_keys = ON");
 
 	db.exec(`

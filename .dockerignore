@@ -6,6 +6,8 @@ dist
 *.db-shm
 *.db-wal
 data/
+server/data/
+*.log
 .git
 .claude
 .vscode

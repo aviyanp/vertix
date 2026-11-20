@@ -1,23 +1,49 @@
 import { SignJWT, jwtVerify } from "jose";
+import { randomBytes } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { getSessionVersion } from "./db.ts";
 
 const SESSION_COOKIE = "vertix_session";
 const MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
-// resolved eagerly at import time so a missing/weak secret crashes the
-// server on boot instead of surfacing later as silently-rejected sessions
+// resolved eagerly at import time so a missing/weak secret is handled on boot
+// instead of surfacing later as silently-rejected sessions
 const secretEnv = process.env.SESSION_SECRET;
-if ((!secretEnv || secretEnv.length < 32) && process.env.NODE_ENV === "production") {
-	throw new Error(
-		"SESSION_SECRET env var missing or too short (min 32 chars) — see .env.example",
-	);
+const isProd = process.env.NODE_ENV === "production";
+
+// No SESSION_SECRET configured: generate one and persist it next to the
+// database, so sessions survive restarts without any manual secret management.
+// (Once written it is stable until the file is deleted.)
+function persistedSecret(): string | null {
+	const dir = process.env.DATA_DIR || path.join(import.meta.dirname);
+	const file = path.join(dir, ".session-secret");
+	try {
+		if (fs.existsSync(file)) {
+			const existing = fs.readFileSync(file, "utf8").trim();
+			if (existing.length >= 32) return existing;
+		}
+		const generated = randomBytes(48).toString("base64");
+		fs.writeFileSync(file, generated, { mode: 0o600 });
+		return generated;
+	} catch {
+		return null;
+	}
 }
-// development only: fixed fallback so `pnpm dev` boots with zero configuration.
-// Sessions signed with it are valid only against a dev server.
+
 const effectiveSecret =
 	secretEnv && secretEnv.length >= 32
 		? secretEnv
-		: "vertix-dev-only-session-secret-not-for-production";
+		: isProd
+			? (persistedSecret() ??
+				(() => {
+					throw new Error(
+						"SESSION_SECRET unset and could not persist one to DATA_DIR — set it in .env",
+					);
+				})())
+			: // development only: fixed fallback so `pnpm dev` boots with zero
+				// configuration; sessions signed with it only work against a dev server
+				"vertix-dev-only-session-secret-not-for-production";
 const SECRET = new TextEncoder().encode(effectiveSecret);
 
 function getSecret(): Uint8Array {

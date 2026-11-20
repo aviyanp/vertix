@@ -153,60 +153,55 @@ Open http://localhost:5173
 
 ## Docker Deployment
 
-1. Copy `.env.example` to `.env` and fill in values:
-   ```
-   NODE_ENV=production
-   SESSION_SECRET=<random-64-char-string>
-   CORS_ORIGINS=
-   TRUST_PROXY=1
-   ADMIN_TOKEN=<random-string>   # enables /admin (optional, min 16 chars)
-   ```
-
-   `TRUST_PROXY` is the number of reverse proxies in front of the server (nginx or
-   Nginx Proxy Manager = 1). It is **required** behind a proxy: without it every
-   player shares one rate-limit key, because the proxy address is the only one the
-   server sees — which caps the whole server at the per-IP connection limit.
-
-2. (Optional) Set up Discord OAuth:
-   ```
-   DISCORD_CLIENT_ID=your-app-id
-   DISCORD_CLIENT_SECRET=your-secret
-   DISCORD_REDIRECT_URI=https://vertix.fr/api/auth/discord/callback
-   ```
-   The redirect URI must be the same origin players open the game on and must be
-   registered in the [Discord developer portal](https://discord.com/developers/applications).
-   When `DISCORD_CLIENT_ID` is empty the game falls back to username-only login
-   (accounts still work — anyone can claim an unclaimed name). Set
-   `ALLOW_LOCAL_LOGIN=false` to disable that fallback, or `=true` to offer it
-   alongside Discord.
-
-3. Create the external network and start:
-   ```bash
-   docker network create vertix-net
-   docker compose up -d
-   ```
-
-4. The server runs on port `1118` in production (page + `/api` + Socket.IO). Port
-   `1119` is dev-only, where Vite proxies the socket separately.
-
-### Data directory permissions
-
-The container runs as the unprivileged `node` user (uid/gid `1000`). The `./data`
-bind mount serves mods to clients **and** holds the writable `vertix.db`, and a
-bind mount keeps whatever ownership the host directory has. If `./data` is owned
-by `root` (for example, Docker creates it as root on the first `docker compose
-up`), the database opens read-only and the server crash-loops with
-`SqliteError: attempt to write a readonly database`.
-
-Fix it once on the host, then start again:
-
 ```bash
-sudo chown -R 1000:1000 data
-docker compose up -d
+docker compose up -d --build
 ```
 
-`1000:1000` is the `node` user inside the `node:24-alpine` image, so this makes
-the host directory writable by the process actually running the server.
+That's it — the server comes up on `127.0.0.1:1118` (page + `/api` + Socket.IO;
+port `1119` is dev-only). No `.env`, network, or permission setup needed:
+
+- The database lives in the `vertix-data` named volume, so no host `chown`.
+- If `SESSION_SECRET` is unset, the server generates one and stores it in the
+  volume — sessions stay valid across restarts.
+- Drop texture mod packs in `./data/mods/` on the host to serve them.
+
+**Migrating an existing `./data/vertix.db`** (from the old bind-mounted setup):
+
+```bash
+docker compose up -d --build          # creates the volume
+docker compose cp data/vertix.db server:/app/data/vertix.db
+docker compose restart server
+```
+
+### Optional configuration
+
+Copy `.env.example` to `.env` to set any of these (all optional):
+
+```
+SESSION_SECRET=<random-64-char-string>  # else auto-generated into the volume
+CORS_ORIGINS=https://your-domain
+TRUST_PROXY=1                           # required behind a reverse proxy
+ADMIN_TOKEN=<random-string>             # enables /admin (min 16 chars)
+```
+
+`TRUST_PROXY` is the number of reverse proxies in front of the server (nginx or
+Nginx Proxy Manager = 1). It is **required** behind a proxy: without it every
+player shares one rate-limit key, because the proxy address is the only one the
+server sees — which caps the whole server at the per-IP connection limit.
+
+### Discord OAuth (optional)
+
+```
+DISCORD_CLIENT_ID=your-app-id
+DISCORD_CLIENT_SECRET=your-secret
+DISCORD_REDIRECT_URI=https://vertix.fr/api/auth/discord/callback
+```
+The redirect URI must be the same origin players open the game on and must be
+registered in the [Discord developer portal](https://discord.com/developers/applications).
+When `DISCORD_CLIENT_ID` is empty the game falls back to username-only login
+(accounts still work — anyone can claim an unclaimed name). Set
+`ALLOW_LOCAL_LOGIN=false` to disable that fallback, or `=true` to offer it
+alongside Discord.
 
 ### Reverse proxy
 

@@ -36,8 +36,10 @@ volumes:
   vertix-data:
 
 networks:
-  # `docker compose up -d` creates it if absent (no pre-step needed), and the
-  # fixed name keeps the documented proxy upstream `server:1118` working for
-  # nginx/npm instances already attached to vertix-net.
+  # External so the same network is shared with the reverse proxy (nginx/npm
+  # joins it to reach http://server:1118) and so an operator-created vertix-net
+  # is reused instead of rejected for missing Compose labels. Create once with:
+  #   docker network create vertix-net
   vertix-net:
+    external: true
     name: vertix-net

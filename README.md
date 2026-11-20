@@ -154,11 +154,12 @@ Open http://localhost:5173
 ## Docker Deployment
 
 ```bash
+docker network create vertix-net   # one time; ignore "already exists"
 docker compose up -d --build
 ```
 
 That's it — the server comes up on `127.0.0.1:1118` (page + `/api` + Socket.IO;
-port `1119` is dev-only). No `.env`, network, or permission setup needed:
+port `1119` is dev-only). No `.env` or permission setup needed:
 
 - The database lives in the `vertix-data` named volume, so no host `chown`.
 - If `SESSION_SECRET` is unset, the server generates one and stores it in the

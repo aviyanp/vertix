@@ -43,18 +43,24 @@ export function clampNumber(value: unknown, min: number, max: number): number {
 	return Math.max(min, Math.min(max, num));
 }
 
+// id spaces aren't dense (camo skips 88, ends at 134) — validate membership,
+// not range
+const hatIds = new Set(hats.map((h) => h.id));
+const shirtIds = new Set(shirts.map((s) => s.id));
+const camoIds = new Set(camos.map((c) => c.id));
+
 export function isValidHatIndex(id: unknown): boolean {
-	return typeof id === "number" && Number.isInteger(id) && id >= 1 && id <= hats.length;
+	return typeof id === "number" && hatIds.has(id);
 }
 
 export function isValidShirtIndex(id: unknown): boolean {
-	return typeof id === "number" && Number.isInteger(id) && id >= 1 && id <= shirts.length;
+	return typeof id === "number" && shirtIds.has(id);
 }
 
 // 0 means "no camo" (client sends `primaryCamo?.id ?? 0`) — always valid,
-// no ownership needed; 1..camos.length are real, ownership-gated camo ids
+// no ownership needed; the rest are real, ownership-gated camo ids
 export function isValidCamoIndex(id: unknown): boolean {
-	return typeof id === "number" && Number.isInteger(id) && id >= 0 && id <= camos.length;
+	return id === 0 || (typeof id === "number" && camoIds.has(id));
 }
 
 export function isValidWeaponIndex(id: unknown, weaponCount: number): boolean {
